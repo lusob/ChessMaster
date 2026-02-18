@@ -4,41 +4,30 @@ Esta aplicación es una **aplicación web estática** que puede desplegarse en c
 
 ## Opciones de Despliegue
 
-### 1. GitHub Pages (Gratis y fácil)
+### 1. GitHub Pages (Gratis y fácil) - RECOMENDADO
 
-1. **Preparar el repositorio:**
-   ```bash
-   cd app
-   npm run build
-   ```
+**Este repositorio ya incluye GitHub Actions configurado para despliegue automático.**
 
-2. **Crear un repositorio en GitHub** (si no lo tienes)
-
-3. **Configurar GitHub Pages:**
-   - Ve a Settings → Pages en tu repositorio
-   - En "Source", selecciona "Deploy from a branch"
-   - Selecciona la rama `main` (o `master`) y la carpeta `/dist`
+1. **Habilitar GitHub Pages:**
+   - Ve a Settings → Pages en tu repositorio de GitHub
+   - En "Source", selecciona **"GitHub Actions"** (no "Deploy from a branch")
    - Guarda los cambios
 
-4. **Subir el código:**
+2. **Hacer push del código:**
    ```bash
-   git init
    git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-   git push -u origin main
+   git commit -m "Add GitHub Actions workflow"
+   git push origin main
    ```
 
-5. **Subir solo la carpeta dist:**
-   ```bash
-   # Crear una rama gh-pages con solo dist
-   git subtree push --prefix app/dist origin gh-pages
-   ```
-   
-   O mejor aún, usa GitHub Actions (ver sección de automatización)
+3. **El despliegue es automático:**
+   - Cada vez que hagas push a `main` o `master`, GitHub Actions construirá y desplegará automáticamente
+   - Puedes ver el progreso en la pestaña "Actions" de tu repositorio
+   - La primera vez puede tardar unos minutos
 
-**URL resultante:** `https://TU_USUARIO.github.io/TU_REPOSITORIO/`
+**URL resultante:** `https://lusob.github.io/ChessMaster/`
+
+**Nota:** Si prefieres usar una rama específica, el workflow está configurado para funcionar con `main` o `master`.
 
 ---
 
