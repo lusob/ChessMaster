@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 11%;
+    --foreground: 0 0% 98%;
+    --card: 220 20% 14%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 20% 14%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 220 14% 20%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 20%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 14% 20%;
+    --input: 220 14% 20%;
+    --ring: 217 91% 60%;
+    --radius: 0.625rem;
+    --sidebar-background: 220 20% 11%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 20%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 14% 20%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  html {
+    @apply antialiased;
+    touch-action: manipulation;
+  }
+  
+  body {
+    @apply bg-gray-900 text-white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Estilos para el tablero de ajedrez */
+  .chess-board-container {
+    @apply relative w-full max-w-lg mx-auto;
+  }
+  
+  /* Mejoras táctiles para móvil */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Botones táctiles */
+  .btn-touch {
+    @apply active:scale-95 transition-transform duration-100;
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-800;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+  
+  /* Safe area para móviles */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  /* Animaciones */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
+  }
+  
+  /* Estilos para inputs */
+  input, textarea, select {
+    @apply bg-gray-800 text-white border-gray-700;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    @apply ring-2 ring-blue-500 border-transparent outline-none;
+  }
+  
+  /* Estilos para range inputs */
+  input[type="range"] {
+    @apply w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
+    @apply w-5 h-5 bg-blue-500 rounded-full appearance-none;
+    margin-top: -6px;
+  }
+  
+  input[type="range"]::-webkit-slider-runnable-track {
+    @apply h-2 bg-gray-700 rounded-lg;
+  }
+  
+  /* Checkbox personalizado */
+  input[type="checkbox"] {
+    @apply w-5 h-5 accent-blue-500 cursor-pointer;
+  }
+}
+
+@layer utilities {
+  /* Utilidades para texto */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Line clamp */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* Estilos específicos para react-chessboard */
+[data-piece] {
+  cursor: grab;
+}
+
+[data-piece]:active {
+  cursor: grabbing;
+}
+
+/* Mejoras de rendimiento para animaciones */
+.will-change-transform {
+  will-change: transform;
+}
+
+/* Prevenir zoom en inputs en iOS */
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
