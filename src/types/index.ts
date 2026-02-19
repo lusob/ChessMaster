@@ -38,6 +38,57 @@ export interface PlayerStats {
   losses: number;
   draws: number;
   eloHistory: { date: number; elo: number }[];
+  // Gamificación (opcional para mantener compatibilidad con datos antiguos)
+  achievements?: Achievement[];
+  streaks?: {
+    win: number;
+    bestWin: number;
+  };
+}
+
+// Insignias / logros sencillos
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  earnedAt: number;
+  // Información opcional (por ejemplo, jugada, rival, apertura, etc.)
+  metadata?: Record<string, unknown>;
+}
+
+// Estado ligero del campeonato tipo suizo
+export interface ChampionshipPlayer {
+  id: string;
+  name: string;
+  emoji: string;
+  elo: number;
+  isUser: boolean;
+  points: number;
+  // Para desempates simples
+  buchholz: number;
+  // Historial para evitar emparejamientos repetidos
+  opponents: string[];
+}
+
+export interface ChampionshipPairing {
+  round: number;
+  table: number;
+  whiteId: string;
+  blackId: string;
+  // '1-0' | '0-1' | '1/2-1/2'
+  result?: string;
+}
+
+export interface ChampionshipState {
+  seasonId: string;
+  currentRound: number;
+  totalRounds: number;
+  players: ChampionshipPlayer[];
+  pairings: ChampionshipPairing[];
+  // Id del jugador usuario para acceso rápido
+  userId: string;
+  startedAt: number;
+  completed: boolean;
 }
 
 export interface CustomBotFormData {
@@ -47,7 +98,14 @@ export interface CustomBotFormData {
   addToTournament: boolean;
 }
 
-export type GameMode = 'menu' | 'game' | 'tournament' | 'custom-bots' | 'stats' | 'profile';
+export type GameMode =
+  | 'menu'
+  | 'game'
+  | 'tournament'
+  | 'championship'
+  | 'custom-bots'
+  | 'stats'
+  | 'profile';
 
 export interface GameState {
   fen: string;

@@ -4,12 +4,18 @@ import type { Square } from 'chess.js';
 import { useChessEngine, useBotTimer } from '@/hooks/useChessEngine';
 import type { Bot } from '@/types';
 import type { Move } from '@/hooks/useChessEngine';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RotateCcw, List, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ChessBoardProps {
   bot: Bot;
   playerColor?: 'w' | 'b';
-  onGameEnd?: (result: 'win' | 'loss' | 'draw', moves: number) => void;
+  onGameEnd?: (payload: {
+    result: 'win' | 'loss' | 'draw';
+    moves: number;
+    reason: string;
+    historySan: string[];
+    lastMoveVerbose?: any;
+  }) => void;
   onMove?: () => void;
 }
 
@@ -21,6 +27,7 @@ export function ChessBoard({
 }: ChessBoardProps) {
   const {
     fen,
+    history,
     isPlayerTurn,
     isCheck,
     moveCount,
@@ -29,13 +36,21 @@ export function ChessBoard({
     makeBotMove,
     isGameOver,
     getGameResult,
+    getHistoryVerbose,
     resetGame,
+    undo,
+    goBack,
+    goForward,
+    isAtLatestPosition,
+    canGoBack,
+    canGoForward,
   } = useChessEngine();
 
   const { isThinking, scheduleBotMove } = useBotTimer();
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});
   const [moveFrom, setMoveFrom] = useState<Square | null>(null);
   const [gameEnded, setGameEnded] = useState(false);
+  const [showMoveHistory, setShowMoveHistory] = useState(false);
 
   // Reset game when bot changes
   const handleReset = useCallback(() => {
@@ -45,9 +60,25 @@ export function ChessBoard({
     setOptionSquares({});
   }, [resetGame]);
 
+  // Handle undo - deshacer último par de movimientos (jugador + bot)
+  const handleUndo = useCallback(() => {
+    if (gameEnded || isThinking || moveCount === 0) return;
+    
+    // Si es turno del jugador, significa que el último movimiento fue del bot
+    // Deshacer bot primero, luego jugador
+    if (isPlayerTurn) {
+      undo(); // Deshacer movimiento del bot
+      undo(); // Deshacer movimiento del jugador
+    } else {
+      // Si es turno del bot, el último movimiento fue del jugador
+      // Solo deshacer el movimiento del jugador (el bot aún no ha movido)
+      undo();
+    }
+  }, [undo, gameEnded, isThinking, isPlayerTurn, moveCount]);
+
   // Manejar clic en pieza (para móvil)
   const onPieceClick = useCallback((args: { isSparePiece: boolean; piece: any; square: string | null }) => {
-    if (!isPlayerTurn || gameEnded || !args.square) return;
+    if (!isPlayerTurn || gameEnded || !isAtLatestPosition() || !args.square) return;
 
     const square = args.square as Square;
     const moves = getLegalMoves(square);
@@ -77,7 +108,7 @@ export function ChessBoard({
   const onSquareClick = useCallback((args: { piece: any; square: string }) => {
     const square = args.square as Square;
     
-    if (!moveFrom || !isPlayerTurn || gameEnded) {
+    if (!moveFrom || !isPlayerTurn || gameEnded || !isAtLatestPosition()) {
       setMoveFrom(null);
       setOptionSquares({});
       return;
@@ -98,10 +129,17 @@ export function ChessBoard({
 
       // Verificar fin del juego
       if (isGameOver()) {
-        const { result } = getGameResult();
+        const { result, reason } = getGameResult();
         if (result) {
           setGameEnded(true);
-          onGameEnd?.(result, moveCount + 1);
+          const verbose = getHistoryVerbose();
+          onGameEnd?.({
+            result,
+            moves: moveCount + 1,
+            reason,
+            historySan: history,
+            lastMoveVerbose: verbose[verbose.length - 1],
+          });
         }
         return;
       }
@@ -111,10 +149,17 @@ export function ChessBoard({
         await makeBotMove(bot.difficulty);
         
         if (isGameOver()) {
-          const { result } = getGameResult();
+          const { result, reason } = getGameResult();
           if (result) {
             setGameEnded(true);
-            onGameEnd?.(result, moveCount + 2);
+            const verbose = getHistoryVerbose();
+            onGameEnd?.({
+              result,
+              moves: moveCount + 2,
+              reason,
+              historySan: history,
+              lastMoveVerbose: verbose[verbose.length - 1],
+            });
           }
         }
       }, 600 + Math.random() * 400);
@@ -124,6 +169,7 @@ export function ChessBoard({
     }
   }, [
     moveFrom, 
+    history,
     isPlayerTurn, 
     gameEnded, 
     makeMove, 
@@ -135,7 +181,9 @@ export function ChessBoard({
     scheduleBotMove,
     makeBotMove,
     bot.difficulty,
-    onPieceClick
+    getHistoryVerbose,
+    onPieceClick,
+    isAtLatestPosition
   ]);
 
   // Movimiento por drag & drop (desktop)
@@ -144,7 +192,7 @@ export function ChessBoard({
     sourceSquare: string; 
     targetSquare: string | null;
   }) => {
-    if (!isPlayerTurn || gameEnded || !args.targetSquare) return false;
+    if (!isPlayerTurn || gameEnded || !isAtLatestPosition() || !args.targetSquare) return false;
 
     const move: Move = {
       from: args.sourceSquare as Square,
@@ -158,10 +206,17 @@ export function ChessBoard({
       onMove?.();
 
       if (isGameOver()) {
-        const { result } = getGameResult();
+        const { result, reason } = getGameResult();
         if (result) {
           setGameEnded(true);
-          onGameEnd?.(result, moveCount + 1);
+          const verbose = getHistoryVerbose();
+          onGameEnd?.({
+            result,
+            moves: moveCount + 1,
+            reason,
+            historySan: history,
+            lastMoveVerbose: verbose[verbose.length - 1],
+          });
         }
         return true;
       }
@@ -170,10 +225,17 @@ export function ChessBoard({
         await makeBotMove(bot.difficulty);
         
         if (isGameOver()) {
-          const { result } = getGameResult();
+          const { result, reason } = getGameResult();
           if (result) {
             setGameEnded(true);
-            onGameEnd?.(result, moveCount + 2);
+            const verbose = getHistoryVerbose();
+            onGameEnd?.({
+              result,
+              moves: moveCount + 2,
+              reason,
+              historySan: history,
+              lastMoveVerbose: verbose[verbose.length - 1],
+            });
           }
         }
       }, 600 + Math.random() * 400);
@@ -193,7 +255,10 @@ export function ChessBoard({
     moveCount,
     scheduleBotMove,
     makeBotMove,
-    bot.difficulty
+    bot.difficulty,
+    history,
+    getHistoryVerbose,
+    isAtLatestPosition
   ]);
 
   // Función para verificar si una pieza es arrastrable
@@ -202,6 +267,7 @@ export function ChessBoard({
     const piece = args.piece;
     return !gameEnded && 
            isPlayerTurn && 
+           isAtLatestPosition() &&
            piece && 
            piece.pieceType && 
            piece.pieceType.startsWith(playerColor);
@@ -272,7 +338,41 @@ export function ChessBoard({
       </div>
 
       {/* Controles */}
-      <div className="flex justify-center mt-4 gap-3">
+      <div className="flex justify-center mt-4 gap-3 flex-wrap">
+        {/* Navegación de movimientos */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goBack}
+            disabled={!canGoBack()}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed 
+                       text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            title="Movimiento anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={goForward}
+            disabled={!canGoForward()}
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed 
+                       text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            title="Siguiente movimiento"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+        {!isAtLatestPosition() && (
+          <div className="px-3 py-2 bg-yellow-600/20 border border-yellow-500/50 text-yellow-400 rounded-lg text-sm">
+            Navegando movimientos anteriores
+          </div>
+        )}
+        <button
+          onClick={() => setShowMoveHistory(!showMoveHistory)}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg 
+                     font-medium transition-colors flex items-center gap-2"
+        >
+          <List className="w-4 h-4" />
+          Movimientos
+        </button>
         <button
           onClick={handleReset}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg 
@@ -281,6 +381,36 @@ export function ChessBoard({
           <span>🔄</span> Nueva partida
         </button>
       </div>
+
+      {/* Historial de movimientos */}
+      {showMoveHistory && (
+        <div className="mt-4 bg-gray-800 rounded-lg p-4 max-h-48 overflow-y-auto">
+          <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+            <List className="w-4 h-4" />
+            Historial de Movimientos
+          </h4>
+          {history.length === 0 ? (
+            <p className="text-gray-400 text-sm">Aún no hay movimientos</p>
+          ) : (
+            <div className="space-y-1 text-sm">
+              {Array.from({ length: Math.ceil(history.length / 2) }).map((_, movePairIdx) => {
+                const whiteMove = history[movePairIdx * 2];
+                const blackMove = history[movePairIdx * 2 + 1];
+                return (
+                  <div
+                    key={movePairIdx}
+                    className="flex items-center gap-2 p-2 rounded bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
+                  >
+                    <span className="text-gray-500 font-medium w-8">{movePairIdx + 1}.</span>
+                    <span className="text-white flex-1">{whiteMove || '-'}</span>
+                    <span className="text-gray-300 flex-1">{blackMove || '-'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Estado del juego */}
       {gameEnded && (

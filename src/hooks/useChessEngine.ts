@@ -187,13 +187,14 @@ function findBestMoveLight(game: Chess, moves: any[]): any {
 }
 
 export function useChessEngine() {
-  const gameRef = useRef(new Chess());
+  const gameRef = useRef(new Chess()); // Juego completo (siempre tiene todos los movimientos)
   const [fen, setFen] = useState(gameRef.current.fen());
   const [history, setHistory] = useState<string[]>([]);
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [status, setStatus] = useState<GameStatus>('playing');
   const [isCheck, setIsCheck] = useState(false);
   const [moveCount, setMoveCount] = useState(0);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1); // -1 = posición actual, >=0 = navegando
   const stockfishRef = useRef<ReturnType<typeof getStockfishEngine> | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -229,31 +230,64 @@ export function useChessEngine() {
   // Sincronizar estado con el juego
   const syncState = useCallback(() => {
     const game = gameRef.current;
-    setFen(game.fen());
-    setHistory(game.history());
-    setIsPlayerTurn(game.turn() === 'w');
-    setIsCheck(game.isCheck());
-    setMoveCount(game.history().length);
-
-    // Determinar estado del juego
-    if (game.isCheckmate()) {
-      setStatus('checkmate');
-    } else if (game.isStalemate()) {
-      setStatus('stalemate');
-    } else if (game.isThreefoldRepetition()) {
-      setStatus('threefold_repetition');
-    } else if (game.isInsufficientMaterial()) {
-      setStatus('insufficient_material');
-    } else if (game.isDraw()) {
-      setStatus('draw');
+    const fullHistory = game.history();
+    
+    // Si estamos navegando, mostrar la posición del historial
+    if (currentHistoryIndex >= 0 && currentHistoryIndex < fullHistory.length) {
+      // Crear un juego temporal hasta el índice especificado
+      const tempGame = new Chess();
+      for (let i = 0; i <= currentHistoryIndex; i++) {
+        tempGame.move(fullHistory[i]);
+      }
+      setFen(tempGame.fen());
+      setHistory(tempGame.history());
+      setIsPlayerTurn(tempGame.turn() === 'w');
+      setIsCheck(tempGame.isCheck());
+      setMoveCount(tempGame.history().length);
+      
+      // Determinar estado del juego en esta posición
+      if (tempGame.isCheckmate()) {
+        setStatus('checkmate');
+      } else if (tempGame.isStalemate()) {
+        setStatus('stalemate');
+      } else if (tempGame.isThreefoldRepetition()) {
+        setStatus('threefold_repetition');
+      } else if (tempGame.isInsufficientMaterial()) {
+        setStatus('insufficient_material');
+      } else if (tempGame.isDraw()) {
+        setStatus('draw');
+      } else {
+        setStatus('playing');
+      }
     } else {
-      setStatus('playing');
+      // Mostrar posición actual completa
+      setFen(game.fen());
+      setHistory(fullHistory);
+      setIsPlayerTurn(game.turn() === 'w');
+      setIsCheck(game.isCheck());
+      setMoveCount(fullHistory.length);
+      
+      // Determinar estado del juego
+      if (game.isCheckmate()) {
+        setStatus('checkmate');
+      } else if (game.isStalemate()) {
+        setStatus('stalemate');
+      } else if (game.isThreefoldRepetition()) {
+        setStatus('threefold_repetition');
+      } else if (game.isInsufficientMaterial()) {
+        setStatus('insufficient_material');
+      } else if (game.isDraw()) {
+        setStatus('draw');
+      } else {
+        setStatus('playing');
+      }
     }
-  }, []);
+  }, [currentHistoryIndex]);
 
   // Reiniciar el juego
   const resetGame = useCallback(() => {
     gameRef.current = new Chess();
+    setCurrentHistoryIndex(-1);
     syncState();
   }, [syncState]);
 
@@ -277,6 +311,18 @@ export function useChessEngine() {
 
   // Realizar un movimiento
   const makeMove = useCallback((move: Move): boolean => {
+    // Solo permitir movimientos si estamos en la posición actual
+    if (currentHistoryIndex !== -1) {
+      // Si estamos navegando, volver a la posición actual primero
+      setCurrentHistoryIndex(-1);
+      // Restaurar el juego completo desde el inicio
+      const fullHistory = gameRef.current.history();
+      gameRef.current = new Chess();
+      fullHistory.forEach(moveSan => {
+        gameRef.current.move(moveSan);
+      });
+    }
+    
     const game = gameRef.current;
     
     try {
@@ -294,7 +340,7 @@ export function useChessEngine() {
     } catch {
       return false;
     }
-  }, [syncState]);
+  }, [syncState, currentHistoryIndex]);
 
   // Movimiento del bot usando Stockfish
   const makeBotMove = useCallback(async (difficulty: number): Promise<Move | null> => {
@@ -455,6 +501,55 @@ export function useChessEngine() {
     return false;
   }, [syncState]);
 
+  // Navegar hacia atrás en el historial
+  const goBack = useCallback(() => {
+    const fullHistory = gameRef.current.history();
+    if (currentHistoryIndex === -1) {
+      // Si estamos en la posición actual, ir al último movimiento
+      if (fullHistory.length > 0) {
+        setCurrentHistoryIndex(fullHistory.length - 1);
+      }
+    } else if (currentHistoryIndex > 0) {
+      setCurrentHistoryIndex(currentHistoryIndex - 1);
+    }
+    syncState();
+  }, [currentHistoryIndex, syncState]);
+
+  // Navegar hacia adelante en el historial
+  const goForward = useCallback(() => {
+    const fullHistory = gameRef.current.history();
+    if (currentHistoryIndex < fullHistory.length - 1) {
+      setCurrentHistoryIndex(currentHistoryIndex + 1);
+    } else if (currentHistoryIndex === fullHistory.length - 1) {
+      // Volver a la posición actual
+      setCurrentHistoryIndex(-1);
+    }
+    syncState();
+  }, [currentHistoryIndex, syncState]);
+
+  // Verificar si estamos en la última posición
+  const isAtLatestPosition = useCallback(() => {
+    return currentHistoryIndex === -1;
+  }, [currentHistoryIndex]);
+
+  // Verificar si podemos ir hacia atrás
+  const canGoBack = useCallback(() => {
+    const fullHistory = gameRef.current.history();
+    if (currentHistoryIndex === -1) {
+      return fullHistory.length > 0;
+    }
+    return currentHistoryIndex > 0;
+  }, [currentHistoryIndex]);
+
+  // Verificar si podemos ir hacia adelante
+  const canGoForward = useCallback(() => {
+    const fullHistory = gameRef.current.history();
+    if (currentHistoryIndex === -1) {
+      return false;
+    }
+    return currentHistoryIndex < fullHistory.length - 1;
+  }, [currentHistoryIndex]);
+
   return {
     fen,
     history,
@@ -469,7 +564,13 @@ export function useChessEngine() {
     makeBotMove,
     isGameOver,
     getGameResult,
+    getHistoryVerbose: () => gameRef.current.history({ verbose: true }) as any[],
     undo,
+    goBack,
+    goForward,
+    isAtLatestPosition,
+    canGoBack,
+    canGoForward,
   };
 }
 

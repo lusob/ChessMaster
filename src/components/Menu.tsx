@@ -35,11 +35,19 @@ export function Menu({ onSelectMode, playerName, playerElo }: MenuProps) {
     },
     {
       mode: 'tournament',
-      title: 'Modo Torneo',
+      title: 'Torneo Rápido',
       description: 'Enfrenta a 4 bots en orden de dificultad',
       icon: <Trophy className="w-6 h-6" />,
       color: 'text-yellow-400',
       bgColor: 'bg-yellow-500/20',
+    },
+    {
+      mode: 'championship',
+      title: 'Campeonato',
+      description: 'Sistema suizo: 40 jugadores, 7 rondas',
+      icon: <Trophy className="w-6 h-6" />,
+      color: 'text-orange-400',
+      bgColor: 'bg-orange-500/20',
     },
     {
       mode: 'custom-bots',

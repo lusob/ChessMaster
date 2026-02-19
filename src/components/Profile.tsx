@@ -1,19 +1,21 @@
 import { useState } from 'react';
-import type { PlayerProfile } from '@/types';
-import { ChevronLeft, User, Edit2, Check, Crown, Star, Award, TrendingUp } from 'lucide-react';
+import type { Achievement, PlayerProfile } from '@/types';
+import { ChevronLeft, User, Edit2, Check, Crown, Star, Award } from 'lucide-react';
 
 interface ProfileProps {
   profile: PlayerProfile | null;
   onCreateProfile: (name: string) => void;
   onUpdateProfile: (updates: Partial<PlayerProfile>) => void;
   onBack: () => void;
+  achievements?: Achievement[];
 }
 
 export function Profile({ 
   profile, 
   onCreateProfile, 
   onUpdateProfile,
-  onBack 
+  onBack,
+  achievements = [],
 }: ProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(profile?.name || '');
@@ -184,69 +186,39 @@ export function Profile({
       <div className="bg-gray-800 p-4 rounded-xl">
         <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
           <Award className="w-5 h-5 text-yellow-400" />
-          Logros
+          Insignias
+          <span className="ml-auto text-xs text-gray-400">{achievements.length}</span>
         </h4>
         
-        <div className="space-y-3">
-          {/* Logro: Primer partida */}
-          <div className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Star className="w-5 h-5 text-white" />
+        {achievements.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 mx-auto mb-3 bg-gray-900/50 rounded-xl flex items-center justify-center">
+              <Star className="w-6 h-6 text-gray-500" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm text-white font-medium">Primeros pasos</p>
-              <p className="text-xs text-gray-500">Juega tu primera partida</p>
-            </div>
+            <p className="text-gray-400 text-sm">Aún no has desbloqueado insignias</p>
+            <p className="text-gray-500 text-xs mt-1">¡Juega partidas y completa retos!</p>
           </div>
-
-          {/* Logro: 1000 ELO */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${
-            profile.elo >= 1000 ? 'bg-gray-900/50' : 'bg-gray-900/30 opacity-50'
-          }`}>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              profile.elo >= 1000 ? 'bg-green-600' : 'bg-gray-600'
-            }`}>
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-white font-medium">Jugador estable</p>
-              <p className="text-xs text-gray-500">Alcanza 1000 ELO</p>
-            </div>
-            {profile.elo >= 1000 && <Check className="w-5 h-5 text-green-400" />}
+        ) : (
+          <div className="space-y-2">
+            {achievements
+              .slice()
+              .sort((a, b) => b.earnedAt - a.earnedAt)
+              .map((a) => (
+                <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg">
+                  <div className="w-10 h-10 bg-yellow-600/20 rounded-lg flex items-center justify-center">
+                    <Award className="w-5 h-5 text-yellow-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-white font-medium">{a.title}</p>
+                    <p className="text-xs text-gray-500">{a.description}</p>
+                  </div>
+                  <span className="text-[10px] text-gray-500">
+                    {new Date(a.earnedAt).toLocaleDateString('es-ES')}
+                  </span>
+                </div>
+              ))}
           </div>
-
-          {/* Logro: 1500 ELO */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${
-            profile.elo >= 1500 ? 'bg-gray-900/50' : 'bg-gray-900/30 opacity-50'
-          }`}>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              profile.elo >= 1500 ? 'bg-purple-600' : 'bg-gray-600'
-            }`}>
-              <Crown className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-white font-medium">Experto</p>
-              <p className="text-xs text-gray-500">Alcanza 1500 ELO</p>
-            </div>
-            {profile.elo >= 1500 && <Check className="w-5 h-5 text-green-400" />}
-          </div>
-
-          {/* Logro: 2000 ELO */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg ${
-            profile.elo >= 2000 ? 'bg-gray-900/50' : 'bg-gray-900/30 opacity-50'
-          }`}>
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              profile.elo >= 2000 ? 'bg-yellow-600' : 'bg-gray-600'
-            }`}>
-              <Award className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm text-white font-medium">Leyenda del ajedrez</p>
-              <p className="text-xs text-gray-500">Alcanza 2000 ELO</p>
-            </div>
-            {profile.elo >= 2000 && <Check className="w-5 h-5 text-green-400" />}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

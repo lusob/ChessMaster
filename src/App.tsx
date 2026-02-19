@@ -1,45 +1,73 @@
 import { useState, useCallback } from 'react';
 import type { GameMode, Bot } from '@/types';
-import { useBots, usePlayerStats, useProfile } from '@/hooks/useStorage';
+import { useBots, usePlayerStats, useProfile, useChampionshipState } from '@/hooks/useStorage';
+import { useAchievements } from '@/hooks/useAchievements';
 import { Menu } from '@/components/Menu';
 import { BotSelector } from '@/components/BotSelector';
 import { Tournament } from '@/components/Tournament';
+import { Championship } from '@/components/Championship';
 import { CustomBots } from '@/components/CustomBots';
 import { Stats } from '@/components/Stats';
 import { Profile } from '@/components/Profile';
 import { ChessBoard } from '@/components/chess/ChessBoard';
 import { ChevronLeft, Trophy } from 'lucide-react';
+import { fireWinConfetti } from '@/lib/confetti';
 
 function App() {
   const [mode, setMode] = useState<GameMode>('menu');
   const [currentBot, setCurrentBot] = useState<Bot | null>(null);
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
+  const [returnMode, setReturnMode] = useState<GameMode>('menu');
 
-  const { bots, isLoaded: botsLoaded, addBot, removeBot, getTournamentBots } = useBots();
+  const {
+    bots,
+    isLoaded: botsLoaded,
+    addBot,
+    removeBot,
+    getTournamentBots,
+    updateFixedBot,
+    resetFixedBots,
+  } = useBots();
   const { stats, isLoaded: statsLoaded, addGameResult } = usePlayerStats();
   const { profile, isLoaded: profileLoaded, createProfile, updateProfile } = useProfile();
+  const { achievements, processGameEnd } = useAchievements(stats);
+  const { submitUserResultAndSimulateRound } = useChampionshipState();
 
   const handleSelectMode = useCallback((newMode: GameMode) => {
     setMode(newMode);
   }, []);
 
-  const handleBackToMenu = useCallback(() => {
-    setMode('menu');
+  const handleBack = useCallback((target: GameMode = 'menu') => {
+    setMode(target);
     setCurrentBot(null);
   }, []);
 
-  const handleSelectBot = useCallback((bot: Bot) => {
+  const startGame = useCallback((bot: Bot, backTo: GameMode) => {
     setCurrentBot(bot);
+    setReturnMode(backTo);
     setMode('game');
   }, []);
 
-  const handleGameEnd = useCallback((result: 'win' | 'loss' | 'draw', moves: number) => {
+  const handleGameEnd = useCallback((payload: {
+    result: 'win' | 'loss' | 'draw';
+    moves: number;
+    reason: string;
+    historySan: string[];
+    lastMoveVerbose?: any;
+  }) => {
     if (currentBot) {
-      addGameResult(result, currentBot.elo, currentBot.name, moves);
+      const playerEloBefore = stats?.profile?.elo ?? 1000;
+
+      addGameResult(payload.result, currentBot.elo, currentBot.name, payload.moves);
+
+      if (payload.result === 'win') {
+        fireWinConfetti();
+      }
       
       // Si estamos en modo torneo y ganamos, avanzar
-      if (result === 'win' && mode === 'game' && currentBot.inTournament) {
+      let tournamentCompleted = false;
+      if (payload.result === 'win' && mode === 'game' && currentBot.inTournament) {
         const tournamentBots = getTournamentBots().sort((a, b) => a.difficulty - b.difficulty);
         const botIndex = tournamentBots.findIndex(b => b.id === currentBot.id);
         
@@ -48,10 +76,43 @@ function App() {
           if (botIndex + 1 > currentTournamentIndex) {
             setCurrentTournamentIndex(botIndex + 1);
           }
+          tournamentCompleted = (tournamentProgress.length + 1) === tournamentBots.length;
         }
       }
+
+      processGameEnd({
+        result: payload.result,
+        reason: payload.reason,
+        moves: payload.moves,
+        opponentElo: currentBot.elo,
+        opponentName: currentBot.name,
+        playerEloBefore,
+        lastMoveVerbose: payload.lastMoveVerbose,
+        tournamentCompleted,
+      });
+
+      // Si estamos en modo campeonato, registrar resultado y simular ronda
+      if (returnMode === 'championship') {
+        submitUserResultAndSimulateRound(payload.result);
+        // Volver al modo campeonato después de la partida
+        setTimeout(() => {
+          setMode('championship');
+          setCurrentBot(null);
+        }, 2000);
+      }
     }
-  }, [currentBot, addGameResult, mode, tournamentProgress, currentTournamentIndex, getTournamentBots]);
+  }, [
+    currentBot,
+    addGameResult,
+    stats?.profile?.elo,
+    mode,
+    tournamentProgress,
+    currentTournamentIndex,
+    getTournamentBots,
+    processGameEnd,
+    returnMode,
+    submitUserResultAndSimulateRound,
+  ]);
 
   // Pantalla de carga
   if (!botsLoaded || !statsLoaded || !profileLoaded) {
@@ -84,7 +145,7 @@ function App() {
             <div className="px-4 py-6">
               <div className="flex items-center gap-4 mb-4">
                 <button
-                  onClick={handleBackToMenu}
+                  onClick={() => handleBack(returnMode)}
                   className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5 text-white" />
@@ -104,8 +165,8 @@ function App() {
         return (
           <BotSelector 
             bots={bots} 
-            onSelectBot={handleSelectBot} 
-            onBack={handleBackToMenu} 
+            onSelectBot={(bot) => startGame(bot, 'menu')} 
+            onBack={() => handleBack('menu')} 
           />
         );
 
@@ -113,10 +174,12 @@ function App() {
         return (
           <Tournament
             bots={bots}
-            onSelectBot={handleSelectBot}
-            onBack={handleBackToMenu}
+            onSelectBot={(bot) => startGame(bot, 'tournament')}
+            onBack={() => handleBack('menu')}
             completedBots={tournamentProgress}
             currentBotIndex={currentTournamentIndex}
+            updateFixedBot={updateFixedBot}
+            resetFixedBots={resetFixedBots}
           />
         );
 
@@ -126,8 +189,8 @@ function App() {
             bots={bots}
             onAddBot={addBot}
             onRemoveBot={removeBot}
-            onBack={handleBackToMenu}
-            onSelectBot={handleSelectBot}
+            onBack={() => handleBack('menu')}
+            onSelectBot={(bot) => startGame(bot, 'custom-bots')}
           />
         );
 
@@ -135,7 +198,7 @@ function App() {
         return (
           <Stats
             stats={stats}
-            onBack={handleBackToMenu}
+            onBack={() => handleBack('menu')}
           />
         );
 
@@ -145,7 +208,32 @@ function App() {
             profile={profile}
             onCreateProfile={createProfile}
             onUpdateProfile={updateProfile}
-            onBack={handleBackToMenu}
+            onBack={() => handleBack('menu')}
+            achievements={achievements}
+          />
+        );
+
+      case 'championship':
+        if (!profile) {
+          return (
+            <div className="w-full max-w-md mx-auto px-4 py-6">
+              <div className="text-center py-12">
+                <p className="text-gray-400 mb-4">Necesitas crear un perfil primero</p>
+                <button
+                  onClick={() => handleSelectMode('profile')}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Crear Perfil
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <Championship
+            userProfile={profile}
+            onSelectBot={(bot) => startGame(bot, 'championship')}
+            onBack={() => handleBack('menu')}
           />
         );
 

@@ -70,16 +70,17 @@ export class StockfishEngine {
         type: typeof stockfishModule,
         isFunction: typeof stockfishModule === 'function',
         isObject: typeof stockfishModule === 'object',
-        keys: stockfishModule ? Object.keys(stockfishModule) : [],
+        keys: stockfishModule ? Object.keys(stockfishModule).slice(0, 20) : [],
         hasDefault: stockfishModule && 'default' in stockfishModule,
-        defaultType: stockfishModule && 'default' in stockfishModule ? typeof stockfishModule.default : 'N/A'
+        defaultType: stockfishModule && 'default' in stockfishModule ? typeof stockfishModule.default : 'N/A',
+        hasCreate: stockfishModule && 'create' in stockfishModule,
+        hasFactory: stockfishModule && 'factory' in stockfishModule,
       });
       
-      // El módulo stockfish se auto-ejecuta y retorna directamente la función factory
-      // Cuando se importa dinámicamente, ejecuta t() directamente y retorna el resultado
+      // El módulo stockfish puede retornar la función factory de diferentes formas
       let StockfishFactory: any = null;
       
-      // El módulo puede retornar directamente la función o un objeto con la función
+      // Intentar diferentes formas de obtener la factory
       if (typeof stockfishModule === 'function') {
         StockfishFactory = stockfishModule;
         console.log('[Stockfish] Encontrada función factory directa');
@@ -91,21 +92,64 @@ export class StockfishEngine {
         } else if (stockfishModule.Stockfish && typeof stockfishModule.Stockfish === 'function') {
           StockfishFactory = stockfishModule.Stockfish;
           console.log('[Stockfish] Encontrada función factory en Stockfish');
+        } else if (stockfishModule.create && typeof stockfishModule.create === 'function') {
+          StockfishFactory = stockfishModule.create;
+          console.log('[Stockfish] Encontrada función factory en create');
+        } else if (stockfishModule.factory && typeof stockfishModule.factory === 'function') {
+          StockfishFactory = stockfishModule.factory;
+          console.log('[Stockfish] Encontrada función factory en factory');
         } else {
-          // Buscar cualquier función exportada
-          for (const key in stockfishModule) {
-            if (typeof stockfishModule[key] === 'function') {
-              StockfishFactory = stockfishModule[key];
-              console.log('[Stockfish] Encontrada función factory en:', key);
-              break;
-            }
+          // Buscar cualquier función exportada que pueda ser la factory
+          const functionKeys = Object.keys(stockfishModule).filter(
+            key => typeof stockfishModule[key] === 'function'
+          );
+          console.log('[Stockfish] Funciones encontradas:', functionKeys);
+          
+          // Si solo hay una función, probablemente sea la factory
+          if (functionKeys.length === 1) {
+            StockfishFactory = stockfishModule[functionKeys[0]];
+            console.log('[Stockfish] Usando única función encontrada:', functionKeys[0]);
+          } else if (functionKeys.length > 0) {
+            // Intentar con la primera función que parezca una factory
+            StockfishFactory = stockfishModule[functionKeys[0]];
+            console.log('[Stockfish] Usando primera función encontrada:', functionKeys[0]);
           }
         }
       }
       
+      // Si aún no encontramos la factory, verificar si el módulo mismo es el resultado ejecutado
       if (!StockfishFactory || typeof StockfishFactory !== 'function') {
+        // Algunas versiones de stockfish ejecutan el módulo y el resultado está en el módulo mismo
+        if (stockfishModule && typeof stockfishModule === 'object') {
+          // Verificar si hay propiedades que indiquen que es una instancia ejecutada
+          if ('postMessage' in stockfishModule || 'ccall' in stockfishModule) {
+            console.log('[Stockfish] El módulo parece ser una instancia ejecutada directamente');
+            // En este caso, el módulo ya está ejecutado, usar directamente
+            this.stockfish = stockfishModule;
+            this.isReady = false;
+            // Continuar con la inicialización
+            this.sendCommand('uci');
+            const maxWait = 10000;
+            const startTime = Date.now();
+            while (!this.isReady && (Date.now() - startTime) < maxWait) {
+              await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            if (this.isReady) {
+              console.log('[Stockfish] ¡Inicializado correctamente desde módulo ejecutado!');
+              return;
+            } else {
+              console.warn('[Stockfish] No se recibió uciok desde módulo ejecutado, usando fallback');
+              this.isReady = false;
+              return;
+            }
+          }
+        }
+        
         console.error('[Stockfish] ERROR: No se encontró la función factory. Módulo completo:', stockfishModule);
-        throw new Error(`No se encontró la función de Stockfish. Tipo del módulo: ${typeof stockfishModule}`);
+        console.error('[Stockfish] El bot usará el motor de fallback (menos inteligente)');
+        // No lanzar error, permitir que use el fallback
+        this.isReady = false;
+        return;
       }
       
       console.log('[Stockfish] Creando instancia con configuración...');

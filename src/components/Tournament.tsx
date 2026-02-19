@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Bot } from '@/types';
-import { ChevronLeft, Lock, Check, Trophy, Star } from 'lucide-react';
+import { ChevronLeft, Lock, Check, Trophy, Star, Pencil } from 'lucide-react';
+import { EditFixedBots } from '@/components/EditFixedBots';
 
 interface TournamentProps {
   bots: Bot[];
@@ -8,6 +9,8 @@ interface TournamentProps {
   onBack: () => void;
   completedBots?: string[];
   currentBotIndex?: number;
+  updateFixedBot?: (botId: string, updates: Partial<Bot>) => void;
+  resetFixedBots?: () => void;
 }
 
 export function Tournament({ 
@@ -15,9 +18,12 @@ export function Tournament({
   onSelectBot, 
   onBack,
   completedBots = [],
-  currentBotIndex = 0
+  currentBotIndex = 0,
+  updateFixedBot,
+  resetFixedBots,
 }: TournamentProps) {
   const [selectedBot, setSelectedBot] = useState<Bot | null>(null);
+  const [isEditingBots, setIsEditingBots] = useState(false);
 
   // Filtrar solo bots del torneo y ordenar por dificultad
   const tournamentBots = bots
@@ -46,9 +52,18 @@ export function Tournament({
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
         <div>
-          <h2 className="text-2xl font-bold text-white">Modo Torneo</h2>
+          <h2 className="text-2xl font-bold text-white">Torneo Rápido</h2>
           <p className="text-sm text-gray-400">Derrota a todos los bots en orden</p>
         </div>
+        {updateFixedBot && resetFixedBots && (
+          <button
+            onClick={() => setIsEditingBots(true)}
+            className="ml-auto p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            aria-label="Editar bots"
+          >
+            <Pencil className="w-5 h-5 text-white" />
+          </button>
+        )}
       </div>
 
       {/* Progreso */}
@@ -154,6 +169,15 @@ export function Tournament({
 
       {/* Spacer para el botón fijo */}
       {selectedBot && <div className="h-20" />}
+
+      {isEditingBots && updateFixedBot && resetFixedBots && (
+        <EditFixedBots
+          bots={bots}
+          updateFixedBot={updateFixedBot}
+          resetFixedBots={resetFixedBots}
+          onClose={() => setIsEditingBots(false)}
+        />
+      )}
     </div>
   );
 }
