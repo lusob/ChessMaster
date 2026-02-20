@@ -309,7 +309,7 @@ export class StockfishEngine {
     if (typeof line !== 'string') {
       return;
     }
-    
+
     if (line.includes('uciok')) {
       console.log('[Stockfish] ¡Recibido uciok!');
       this.isReady = true;
@@ -322,6 +322,22 @@ export class StockfishEngine {
           type: 'bestmove',
           ...move,
         });
+      }
+    } else if (line.startsWith('info')) {
+      // Parsear score cp para análisis
+      const scoreMatch = line.match(/score cp (-?\d+)/);
+      const mateMatch = line.match(/score mate (-?\d+)/);
+      const depthMatch = line.match(/\bdepth (\d+)\b/);
+      const depth = depthMatch ? parseInt(depthMatch[1], 10) : 0;
+      if (depth >= 10 && (scoreMatch || mateMatch)) {
+        let score: number;
+        if (mateMatch) {
+          const mateIn = parseInt(mateMatch[1], 10);
+          score = mateIn > 0 ? 100000 : -100000;
+        } else {
+          score = parseInt(scoreMatch![1], 10);
+        }
+        this.notifyCallbacks('analyze', { type: 'info', score });
       }
     }
   }
@@ -383,6 +399,54 @@ export class StockfishEngine {
       this.sendCommand(`setoption name Skill Level value ${params.skillLevel}`);
       this.sendCommand(`setoption name UCI_LimitStrength value ${params.skillLevel < 20 ? 'true' : 'false'}`);
       this.sendCommand(`go depth ${params.depth} movetime ${params.movetime}`);
+    });
+  }
+
+  /**
+   * Analiza la posición actual y retorna el score en centipawns (desde el punto de vista de quien mueve).
+   * Usa depth 12 con movetime 800ms para un análisis rápido pero confiable.
+   */
+  analyzePosition(fen: string): Promise<number> {
+    return new Promise((resolve) => {
+      if (!this.isReady || !this.stockfish) {
+        resolve(0);
+        return;
+      }
+
+      let lastScore: number | null = null;
+
+      const timeout = setTimeout(() => {
+        this.callbacks.delete('analyze');
+        resolve(lastScore ?? 0);
+      }, 1500);
+
+      // Override: acumulamos el último score y resolvemos al recibir bestmove
+      const analyzeCallback = (response: StockfishResponse) => {
+        if (response.type === 'info' && response.score !== undefined) {
+          lastScore = response.score;
+          // Re-registrar para seguir recibiendo updates hasta que llegue bestmove
+          this.callbacks.set('analyze', analyzeCallback);
+        }
+      };
+
+      const goCallback = (_response: StockfishResponse) => {
+        clearTimeout(timeout);
+        this.callbacks.delete('analyze');
+        resolve(lastScore ?? 0);
+      };
+
+      this.callbacks.set('analyze', analyzeCallback);
+      // Sobreescribir callback de go para resolver la promesa
+      const origGoCallback = this.callbacks.get('go');
+      this.callbacks.set('go', (r) => {
+        goCallback(r);
+        // Restaurar callback previo si existía
+        if (origGoCallback) this.callbacks.set('go', origGoCallback);
+      });
+
+      this.sendCommand(`position fen ${fen}`);
+      this.sendCommand('setoption name Skill Level value 20');
+      this.sendCommand('go depth 12 movetime 800');
     });
   }
 

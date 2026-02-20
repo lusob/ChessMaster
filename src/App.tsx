@@ -16,6 +16,7 @@ import { fireWinConfetti } from '@/lib/confetti';
 function App() {
   const [mode, setMode] = useState<GameMode>('menu');
   const [currentBot, setCurrentBot] = useState<Bot | null>(null);
+  const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
   const [returnMode, setReturnMode] = useState<GameMode>('menu');
@@ -43,8 +44,9 @@ function App() {
     setCurrentBot(null);
   }, []);
 
-  const startGame = useCallback((bot: Bot, backTo: GameMode) => {
+  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w') => {
     setCurrentBot(bot);
+    setPlayerColor(color);
     setReturnMode(backTo);
     setMode('game');
   }, []);
@@ -135,10 +137,11 @@ function App() {
     switch (mode) {
       case 'menu':
         return (
-          <Menu 
-            onSelectMode={handleSelectMode} 
+          <Menu
+            onSelectMode={handleSelectMode}
             playerName={profile?.name}
             playerElo={profile?.elo}
+            playerAvatar={profile?.avatar}
           />
         );
 
@@ -158,8 +161,9 @@ function App() {
                   <p className="text-sm text-gray-400">vs {currentBot.name}</p>
                 </div>
               </div>
-              <ChessBoard 
-                bot={currentBot} 
+              <ChessBoard
+                bot={currentBot}
+                playerColor={playerColor}
                 onGameEnd={handleGameEnd}
               />
             </div>
@@ -235,7 +239,7 @@ function App() {
         return (
           <Championship
             userProfile={profile}
-            onSelectBot={(bot) => startGame(bot, 'championship')}
+            onSelectBot={(bot, color) => startGame(bot, 'championship', color ?? 'w')}
             onBack={() => handleBack('menu')}
           />
         );

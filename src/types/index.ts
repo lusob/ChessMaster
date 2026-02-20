@@ -89,6 +89,8 @@ export interface ChampionshipState {
   userId: string;
   startedAt: number;
   completed: boolean;
+  // Color del usuario en la última ronda jugada ('w' | 'b'), para alternar
+  lastUserColor?: 'w' | 'b';
 }
 
 export interface CustomBotFormData {

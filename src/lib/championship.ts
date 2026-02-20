@@ -221,21 +221,28 @@ export function generatePairingsForCurrentRound(state: ChampionshipState): Champ
     return bestIdx;
   };
 
+  // Determinar color del usuario para esta ronda (alternando respecto a la anterior)
+  const userColorThisRound: 'w' | 'b' = state.lastUserColor === 'w' ? 'b' : 'w';
+
   let table = 1;
   while (unpaired.length > 0) {
     const p = unpaired.shift()!;
     const oppIdx = takeNextOpponent(p);
     const q = oppIdx >= 0 ? unpaired.splice(oppIdx, 1)[0] : unpaired.shift()!;
 
-    // Forzar usuario como blancas para simplificar UX (playerColor actual es 'w')
+    // Alternar color del usuario entre rondas
     let whiteId = p.id;
     let blackId = q.id;
-    if (p.id === state.userId) {
-      whiteId = p.id;
-      blackId = q.id;
-    } else if (q.id === state.userId) {
-      whiteId = q.id;
-      blackId = p.id;
+    if (p.id === state.userId || q.id === state.userId) {
+      const userIsP = p.id === state.userId;
+      const opp = userIsP ? q : p;
+      if (userColorThisRound === 'w') {
+        whiteId = state.userId;
+        blackId = opp.id;
+      } else {
+        whiteId = opp.id;
+        blackId = state.userId;
+      }
     } else {
       // Alternar colores por mesa (simple)
       if (table % 2 === 0) {
@@ -281,19 +288,25 @@ export function setUserResultForCurrentRound(
   const pairing = getUserPairingForRound(state, round);
   if (!pairing) return state;
 
+  // Determinar qué color jugó el usuario en este emparejamiento
+  const userIsWhite = pairing.whiteId === state.userId;
+
   const nextPairings = state.pairings.map((p) => {
     if (p.round !== round) return p;
     if (p.table !== pairing.table) return p;
 
-    // Usuario como blancas por diseño
     let r: string;
-    if (result === 'win') r = '1-0';
-    else if (result === 'loss') r = '0-1';
+    if (result === 'win')  r = userIsWhite ? '1-0' : '0-1';
+    else if (result === 'loss') r = userIsWhite ? '0-1' : '1-0';
     else r = '1/2-1/2';
     return { ...p, result: r };
   });
 
-  return recalculateStandings({ ...state, pairings: nextPairings });
+  return recalculateStandings({
+    ...state,
+    pairings: nextPairings,
+    lastUserColor: userIsWhite ? 'w' : 'b',
+  });
 }
 
 function simulateResult(a: ChampionshipPlayer, b: ChampionshipPlayer) {

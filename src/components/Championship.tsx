@@ -10,7 +10,7 @@ import { ChevronLeft, Trophy, Play, Award, TrendingUp, List, BarChart2 } from 'l
 
 interface ChampionshipProps {
   userProfile: { id: string; name: string; elo: number; createdAt: number };
-  onSelectBot: (bot: Bot) => void;
+  onSelectBot: (bot: Bot, playerColor?: 'w' | 'b') => void;
   onBack: () => void;
 }
 
@@ -163,6 +163,11 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
         : currentPairing.whiteId;
     const opponent = championship.players.find((p) => p.id === opponentId);
     return opponent ? championshipPlayerToBot(opponent) : null;
+  }, [championship, currentPairing]);
+
+  const userColorThisRound = useMemo((): 'w' | 'b' => {
+    if (!championship || !currentPairing) return 'w';
+    return currentPairing.whiteId === championship.userId ? 'w' : 'b';
   }, [championship, currentPairing]);
 
   const fullRanking = useMemo(() => {
@@ -459,10 +464,15 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
                     <p className="text-xs text-gray-500">
                       {opponentBot.elo < 500 ? '😅 Debutante' : opponentBot.elo < 900 ? '🧐 Intermedio' : '🏆 Avanzado'}
                     </p>
+                    <p className="text-xs font-semibold mt-0.5">
+                      <span className={userColorThisRound === 'w' ? 'text-white' : 'text-gray-500'}>
+                        {userColorThisRound === 'w' ? '⬜ Juegas con blancas' : '⬛ Juegas con negras'}
+                      </span>
+                    </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => onSelectBot(opponentBot)}
+                  onClick={() => onSelectBot(opponentBot, userColorThisRound)}
                   className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors flex items-center gap-2"
                 >
                   <Play className="w-4 h-4" />
