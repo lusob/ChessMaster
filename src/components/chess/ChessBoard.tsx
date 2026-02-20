@@ -31,6 +31,7 @@ export function ChessBoard({
     isPlayerTurn,
     isCheck,
     moveCount,
+    materialAdvantage,
     getLegalMoves,
     makeMove,
     makeBotMove,
@@ -285,9 +286,9 @@ export function ChessBoard({
   return (
     <div className="w-full max-w-lg mx-auto">
       {/* Info del bot */}
-      <div className="flex items-center justify-between mb-4 bg-gray-800 rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2 bg-gray-800 rounded-lg p-3">
         <div className="flex items-center gap-3">
-          <div 
+          <div
             className="w-10 h-10 rounded-full flex items-center justify-center text-2xl"
             style={{ backgroundColor: bot.color }}
           >
@@ -305,6 +306,26 @@ export function ChessBoard({
           </div>
         )}
       </div>
+
+      {/* Ventaja de material */}
+      {moveCount > 0 && !gameEnded && (() => {
+        // playerColor 'w' means player is white: positive advantage favors player
+        const playerAdv = playerColor === 'w' ? materialAdvantage : -materialAdvantage;
+        if (playerAdv === 0) return (
+          <div className="flex items-center justify-center mb-2 text-xs text-gray-400">
+            Material igualado
+          </div>
+        );
+        const label = playerAdv > 0
+          ? `+${Math.round(playerAdv / 100)} piezas de ventaja`
+          : `${Math.round(playerAdv / 100)} piezas de desventaja`;
+        const color = playerAdv > 0 ? 'text-green-400' : 'text-red-400';
+        return (
+          <div className={`flex items-center justify-center mb-2 text-xs font-semibold ${color}`}>
+            {label}
+          </div>
+        );
+      })()}
 
       {/* Tablero */}
       <div className="relative">
@@ -395,19 +416,38 @@ export function ChessBoard({
         </div>
       )}
 
-      {/* Estado del juego */}
-      {gameEnded && (
-        <div className="mt-4 p-4 bg-gray-800 rounded-lg text-center">
-          <p className="text-lg font-bold text-white">
-            {getGameResult().result === 'win' && '🎉 ¡Victoria!'}
-            {getGameResult().result === 'loss' && '😔 Derrota'}
-            {getGameResult().result === 'draw' && '🤝 Tablas'}
-          </p>
-          <p className="text-sm text-gray-400 mt-1">
-            {getGameResult().reason}
-          </p>
-        </div>
-      )}
+      {/* Estado del juego - overlay prominente */}
+      {gameEnded && (() => {
+        const { result, reason } = getGameResult();
+        const isWin = result === 'win';
+        const isDraw = result === 'draw';
+        return (
+          <div className="mt-4 p-6 rounded-xl text-center border-2"
+            style={{
+              background: isWin ? 'rgba(22,163,74,0.15)' : isDraw ? 'rgba(100,116,139,0.2)' : 'rgba(220,38,38,0.15)',
+              borderColor: isWin ? '#16a34a' : isDraw ? '#64748b' : '#dc2626',
+            }}
+          >
+            <p className="text-3xl mb-1">
+              {isWin ? '🎉' : isDraw ? '🤝' : '😔'}
+            </p>
+            <p className="text-2xl font-bold text-white mb-1">
+              {isWin ? '¡Victoria!' : isDraw ? 'Tablas' : 'Derrota'}
+            </p>
+            <p className="text-sm font-semibold mb-3"
+              style={{ color: isWin ? '#4ade80' : isDraw ? '#94a3b8' : '#f87171' }}
+            >
+              {reason}
+            </p>
+            <button
+              onClick={handleReset}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            >
+              Nueva partida
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

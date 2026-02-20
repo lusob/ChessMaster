@@ -186,6 +186,22 @@ function findBestMoveLight(game: Chess, moves: any[]): any {
   return bestMove;
 }
 
+// Calcula la ventaja de material desde la perspectiva de las blancas
+function getMaterialAdvantage(game: Chess): number {
+  let score = 0;
+  const board = game.board();
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row][col];
+      if (piece) {
+        const value = PIECE_VALUES[piece.type] || 0;
+        score += piece.color === 'w' ? value : -value;
+      }
+    }
+  }
+  return score;
+}
+
 export function useChessEngine() {
   const gameRef = useRef(new Chess()); // Juego completo (siempre tiene todos los movimientos)
   const [fen, setFen] = useState(gameRef.current.fen());
@@ -194,7 +210,9 @@ export function useChessEngine() {
   const [status, setStatus] = useState<GameStatus>('playing');
   const [isCheck, setIsCheck] = useState(false);
   const [moveCount, setMoveCount] = useState(0);
+  const [materialAdvantage, setMaterialAdvantage] = useState(0); // >0 blancas ganan, <0 negras ganan
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1); // -1 = posición actual, >=0 = navegando
+  const historyIndexRef = useRef(-1); // ref síncrono para syncState
   const stockfishRef = useRef<ReturnType<typeof getStockfishEngine> | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -231,7 +249,8 @@ export function useChessEngine() {
   const syncState = useCallback(() => {
     const game = gameRef.current;
     const fullHistory = game.history();
-    
+    const currentHistoryIndex = historyIndexRef.current;
+
     // Si estamos navegando, mostrar la posición del historial
     if (currentHistoryIndex >= 0 && currentHistoryIndex < fullHistory.length) {
       // Crear un juego temporal hasta el índice especificado
@@ -244,6 +263,7 @@ export function useChessEngine() {
       setIsPlayerTurn(tempGame.turn() === 'w');
       setIsCheck(tempGame.isCheck());
       setMoveCount(tempGame.history().length);
+      setMaterialAdvantage(getMaterialAdvantage(tempGame));
       
       // Determinar estado del juego en esta posición
       if (tempGame.isCheckmate()) {
@@ -266,6 +286,7 @@ export function useChessEngine() {
       setIsPlayerTurn(game.turn() === 'w');
       setIsCheck(game.isCheck());
       setMoveCount(fullHistory.length);
+      setMaterialAdvantage(getMaterialAdvantage(game));
       
       // Determinar estado del juego
       if (game.isCheckmate()) {
@@ -282,14 +303,19 @@ export function useChessEngine() {
         setStatus('playing');
       }
     }
-  }, [currentHistoryIndex]);
+  }, []);
+
+  const setHistoryIndex = useCallback((index: number) => {
+    historyIndexRef.current = index;
+    setCurrentHistoryIndex(index);
+  }, []);
 
   // Reiniciar el juego
   const resetGame = useCallback(() => {
     gameRef.current = new Chess();
-    setCurrentHistoryIndex(-1);
+    setHistoryIndex(-1);
     syncState();
-  }, [syncState]);
+  }, [syncState, setHistoryIndex]);
 
   // Cargar posición FEN
   const loadFen = useCallback((fenString: string) => {
@@ -312,15 +338,9 @@ export function useChessEngine() {
   // Realizar un movimiento
   const makeMove = useCallback((move: Move): boolean => {
     // Solo permitir movimientos si estamos en la posición actual
-    if (currentHistoryIndex !== -1) {
+    if (historyIndexRef.current !== -1) {
       // Si estamos navegando, volver a la posición actual primero
-      setCurrentHistoryIndex(-1);
-      // Restaurar el juego completo desde el inicio
-      const fullHistory = gameRef.current.history();
-      gameRef.current = new Chess();
-      fullHistory.forEach(moveSan => {
-        gameRef.current.move(moveSan);
-      });
+      setHistoryIndex(-1);
     }
     
     const game = gameRef.current;
@@ -340,7 +360,7 @@ export function useChessEngine() {
     } catch {
       return false;
     }
-  }, [syncState, currentHistoryIndex]);
+  }, [syncState, setHistoryIndex]);
 
   // Movimiento del bot usando Stockfish
   const makeBotMove = useCallback(async (difficulty: number): Promise<Move | null> => {
@@ -504,28 +524,28 @@ export function useChessEngine() {
   // Navegar hacia atrás en el historial
   const goBack = useCallback(() => {
     const fullHistory = gameRef.current.history();
-    if (currentHistoryIndex === -1) {
-      // Si estamos en la posición actual, ir al último movimiento
+    const idx = historyIndexRef.current;
+    if (idx === -1) {
       if (fullHistory.length > 0) {
-        setCurrentHistoryIndex(fullHistory.length - 1);
+        setHistoryIndex(fullHistory.length - 1);
       }
-    } else if (currentHistoryIndex > 0) {
-      setCurrentHistoryIndex(currentHistoryIndex - 1);
+    } else if (idx > 0) {
+      setHistoryIndex(idx - 1);
     }
     syncState();
-  }, [currentHistoryIndex, syncState]);
+  }, [syncState, setHistoryIndex]);
 
   // Navegar hacia adelante en el historial
   const goForward = useCallback(() => {
     const fullHistory = gameRef.current.history();
-    if (currentHistoryIndex < fullHistory.length - 1) {
-      setCurrentHistoryIndex(currentHistoryIndex + 1);
-    } else if (currentHistoryIndex === fullHistory.length - 1) {
-      // Volver a la posición actual
-      setCurrentHistoryIndex(-1);
+    const idx = historyIndexRef.current;
+    if (idx < fullHistory.length - 1) {
+      setHistoryIndex(idx + 1);
+    } else if (idx === fullHistory.length - 1) {
+      setHistoryIndex(-1);
     }
     syncState();
-  }, [currentHistoryIndex, syncState]);
+  }, [syncState, setHistoryIndex]);
 
   // Verificar si estamos en la última posición
   const isAtLatestPosition = useCallback(() => {
@@ -543,10 +563,10 @@ export function useChessEngine() {
 
   // Verificar si podemos ir hacia adelante
   const canGoForward = useCallback(() => {
-    const fullHistory = gameRef.current.history();
     if (currentHistoryIndex === -1) {
       return false;
     }
+    const fullHistory = gameRef.current.history();
     return currentHistoryIndex < fullHistory.length - 1;
   }, [currentHistoryIndex]);
 
@@ -557,6 +577,7 @@ export function useChessEngine() {
     status,
     isCheck,
     moveCount,
+    materialAdvantage,
     resetGame,
     loadFen,
     getLegalMoves,

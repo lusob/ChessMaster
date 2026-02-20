@@ -219,7 +219,8 @@ export function usePlayerStats() {
     result: 'win' | 'loss' | 'draw',
     opponentElo: number,
     opponentName: string,
-    moves: number
+    moves: number,
+    onEloUpdated?: (newElo: number) => void,
   ) => {
     setStats((prev) => {
       if (!prev) return null;
@@ -260,7 +261,7 @@ export function usePlayerStats() {
 
       localStorage.setItem(STORAGE_KEYS.PLAYER_STATS, JSON.stringify(updatedStats));
       localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(updatedStats.profile));
-      
+      if (onEloUpdated) onEloUpdated(newElo);
       return updatedStats;
     });
   }, []);

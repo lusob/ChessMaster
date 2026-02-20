@@ -59,7 +59,9 @@ function App() {
     if (currentBot) {
       const playerEloBefore = stats?.profile?.elo ?? 1000;
 
-      addGameResult(payload.result, currentBot.elo, currentBot.name, payload.moves);
+      addGameResult(payload.result, currentBot.elo, currentBot.name, payload.moves, (newElo) => {
+        updateProfile({ elo: newElo });
+      });
 
       if (payload.result === 'win') {
         fireWinConfetti();
@@ -104,6 +106,7 @@ function App() {
   }, [
     currentBot,
     addGameResult,
+    updateProfile,
     stats?.profile?.elo,
     mode,
     tournamentProgress,

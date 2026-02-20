@@ -15,17 +15,17 @@ export interface StockfishResponse {
 }
 
 // Mapeo de dificultad a parámetros de Stockfish
-function getStockfishParams(difficulty: number): { depth: number; movetime: number } {
+function getStockfishParams(difficulty: number): { depth: number; movetime: number; skillLevel: number } {
   if (difficulty <= 2) {
-    return { depth: 1, movetime: 100 };
+    return { depth: 1, movetime: 100, skillLevel: 0 };
   } else if (difficulty <= 4) {
-    return { depth: 2, movetime: 200 };
+    return { depth: 2, movetime: 200, skillLevel: 5 };
   } else if (difficulty <= 6) {
-    return { depth: 3, movetime: 500 };
+    return { depth: 3, movetime: 500, skillLevel: 10 };
   } else if (difficulty <= 8) {
-    return { depth: 4, movetime: 1000 };
+    return { depth: 4, movetime: 1000, skillLevel: 15 };
   } else {
-    return { depth: 5, movetime: 2000 };
+    return { depth: 5, movetime: 2000, skillLevel: 20 };
   }
 }
 
@@ -314,10 +314,6 @@ export class StockfishEngine {
       console.log('[Stockfish] ¡Recibido uciok!');
       this.isReady = true;
       this.notifyCallbacks('init', { type: 'ready' });
-      
-      // Configurar Stockfish para máxima fuerza
-      this.sendCommand('setoption name Skill Level value 20');
-      this.sendCommand('setoption name UCI_LimitStrength value false');
     } else if (line.startsWith('bestmove')) {
       console.log('[Stockfish] Recibido bestmove:', line);
       const move = this.parseBestMove(line);
@@ -384,6 +380,8 @@ export class StockfishEngine {
       });
 
       const params = getStockfishParams(difficulty);
+      this.sendCommand(`setoption name Skill Level value ${params.skillLevel}`);
+      this.sendCommand(`setoption name UCI_LimitStrength value ${params.skillLevel < 20 ? 'true' : 'false'}`);
       this.sendCommand(`go depth ${params.depth} movetime ${params.movetime}`);
     });
   }
