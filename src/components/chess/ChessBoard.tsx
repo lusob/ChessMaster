@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Chessboard } from 'react-chessboard';
 import type { Square } from 'chess.js';
 import { useChessEngine, useBotTimer } from '@/hooks/useChessEngine';
@@ -6,13 +6,14 @@ import type { Bot } from '@/types';
 import type { Move, MoveAnnotation } from '@/hooks/useChessEngine';
 import { Loader2, List, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
 
-const ANNOTATION_INFO: Record<MoveAnnotation, { label: string; symbol: string; color: string }> = {
-  brilliant:  { label: 'Brillante',   symbol: '✨', color: 'bg-cyan-600 text-white' },
-  excellent:  { label: 'Excelente',   symbol: '!!', color: 'bg-green-600 text-white' },
-  good:       { label: 'Buena',       symbol: '!',  color: 'bg-green-700 text-white' },
-  inaccuracy: { label: 'Imprecisión', symbol: '?!', color: 'bg-yellow-600 text-white' },
-  mistake:    { label: 'Error',       symbol: '?',  color: 'bg-orange-600 text-white' },
-  blunder:    { label: 'Blunder',     symbol: '??', color: 'bg-red-600 text-white' },
+// Color de la barra de calidad del movimiento (de rojo a verde según anotación)
+const ANNOTATION_BAR: Record<MoveAnnotation, { color: string; width: number; label: string; symbol: string }> = {
+  brilliant:  { color: 'bg-cyan-400',   width: 100, label: 'Brillante',   symbol: '✨' },
+  excellent:  { color: 'bg-green-400',  width: 90,  label: 'Excelente',   symbol: '!!' },
+  good:       { color: 'bg-green-600',  width: 75,  label: 'Buena',       symbol: '!'  },
+  inaccuracy: { color: 'bg-yellow-400', width: 50,  label: 'Imprecisión', symbol: '?!' },
+  mistake:    { color: 'bg-orange-400', width: 30,  label: 'Error',       symbol: '?'  },
+  blunder:    { color: 'bg-red-500',    width: 10,  label: 'Blunder',     symbol: '??' },
 };
 
 interface ChessBoardProps {
@@ -28,11 +29,11 @@ interface ChessBoardProps {
   onMove?: () => void;
 }
 
-export function ChessBoard({ 
-  bot, 
-  playerColor = 'w', 
+export function ChessBoard({
+  bot,
+  playerColor = 'w',
   onGameEnd,
-  onMove 
+  onMove,
 }: ChessBoardProps) {
   const {
     fen,
@@ -41,7 +42,6 @@ export function ChessBoard({
     isCheck,
     moveCount,
     materialAdvantage,
-    lastMoveAnnotation,
     moveAnnotations,
     getLegalMoves,
     makeMove,
@@ -63,9 +63,37 @@ export function ChessBoard({
   const [moveFrom, setMoveFrom] = useState<Square | null>(null);
   const [gameEnded, setGameEnded] = useState(false);
   const [showMoveHistory, setShowMoveHistory] = useState(false);
+  const botFirstMoveFired = useRef(false);
+
+  // Si el jugador juega con negras, el bot (blancas) debe mover primero
+  useEffect(() => {
+    if (playerColor === 'b' && !gameEnded && !botFirstMoveFired.current) {
+      botFirstMoveFired.current = true;
+      scheduleBotMove(async () => {
+        await makeBotMove(bot.difficulty);
+        if (isGameOver()) {
+          const { result, reason } = getGameResult();
+          if (result) {
+            setGameEnded(true);
+            const verbose = getHistoryVerbose();
+            onGameEnd?.({
+              result,
+              moves: 1,
+              reason,
+              historySan: [],
+              lastMoveVerbose: verbose[verbose.length - 1],
+            });
+          }
+        }
+      }, 600);
+    }
+  // Only run once on mount - intentional empty-ish deps (playerColor/bot won't change mid-game)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset game when bot changes
   const handleReset = useCallback(() => {
+    botFirstMoveFired.current = false;
     resetGame();
     setGameEnded(false);
     setMoveFrom(null);
@@ -78,44 +106,33 @@ export function ChessBoard({
 
     const square = args.square as Square;
     const moves = getLegalMoves(square);
-    
+
     if (moves.length > 0) {
       setMoveFrom(square);
       const newSquares: Record<string, React.CSSProperties> = {};
-      
-      // Marcar casilla origen
-      newSquares[square] = {
-        background: 'rgba(255, 255, 0, 0.4)',
-      };
-      
-      // Marcar movimientos posibles
+
+      newSquares[square] = { background: 'rgba(255, 255, 0, 0.4)' };
       moves.forEach((move) => {
         newSquares[move] = {
           background: 'radial-gradient(circle, rgba(0,0,0,.1) 25%, transparent 25%)',
           borderRadius: '50%',
         };
       });
-      
       setOptionSquares(newSquares);
     }
-  }, [isPlayerTurn, gameEnded, getLegalMoves]);
+  }, [isPlayerTurn, gameEnded, getLegalMoves, isAtLatestPosition]);
 
   // Manejar clic en casilla destino
   const onSquareClick = useCallback((args: { piece: any; square: string }) => {
     const square = args.square as Square;
-    
+
     if (!moveFrom || !isPlayerTurn || gameEnded || !isAtLatestPosition()) {
       setMoveFrom(null);
       setOptionSquares({});
       return;
     }
 
-    const move: Move = {
-      from: moveFrom,
-      to: square,
-      promotion: 'q', // Auto-promoción a reina
-    };
-
+    const move: Move = { from: moveFrom, to: square, promotion: 'q' };
     const success = makeMove(move);
 
     if (success) {
@@ -123,69 +140,41 @@ export function ChessBoard({
       setOptionSquares({});
       onMove?.();
 
-      // Verificar fin del juego
       if (isGameOver()) {
         const { result, reason } = getGameResult();
         if (result) {
           setGameEnded(true);
           const verbose = getHistoryVerbose();
-          onGameEnd?.({
-            result,
-            moves: moveCount + 1,
-            reason,
-            historySan: history,
-            lastMoveVerbose: verbose[verbose.length - 1],
-          });
+          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
         }
         return;
       }
 
-      // Turno del bot
       scheduleBotMove(async () => {
         await makeBotMove(bot.difficulty);
-        
         if (isGameOver()) {
           const { result, reason } = getGameResult();
           if (result) {
             setGameEnded(true);
             const verbose = getHistoryVerbose();
-            onGameEnd?.({
-              result,
-              moves: moveCount + 2,
-              reason,
-              historySan: history,
-              lastMoveVerbose: verbose[verbose.length - 1],
-            });
+            onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
           }
         }
       }, 600 + Math.random() * 400);
     } else {
-      // Intentar seleccionar nueva pieza
       onPieceClick({ isSparePiece: false, piece: args.piece, square });
     }
   }, [
-    moveFrom, 
-    history,
-    isPlayerTurn, 
-    gameEnded, 
-    makeMove, 
-    onMove, 
-    isGameOver, 
-    getGameResult, 
-    onGameEnd, 
-    moveCount,
-    scheduleBotMove,
-    makeBotMove,
-    bot.difficulty,
-    getHistoryVerbose,
-    onPieceClick,
-    isAtLatestPosition
+    moveFrom, history, isPlayerTurn, gameEnded, makeMove, onMove,
+    isGameOver, getGameResult, onGameEnd, moveCount,
+    scheduleBotMove, makeBotMove, bot.difficulty,
+    getHistoryVerbose, onPieceClick, isAtLatestPosition,
   ]);
 
   // Movimiento por drag & drop (desktop)
-  const onPieceDrop = useCallback((args: { 
-    piece: any; 
-    sourceSquare: string; 
+  const onPieceDrop = useCallback((args: {
+    piece: any;
+    sourceSquare: string;
     targetSquare: string | null;
   }) => {
     if (!isPlayerTurn || gameEnded || !isAtLatestPosition() || !args.targetSquare) return false;
@@ -195,7 +184,6 @@ export function ChessBoard({
       to: args.targetSquare as Square,
       promotion: 'q',
     };
-
     const success = makeMove(move);
 
     if (success) {
@@ -206,79 +194,51 @@ export function ChessBoard({
         if (result) {
           setGameEnded(true);
           const verbose = getHistoryVerbose();
-          onGameEnd?.({
-            result,
-            moves: moveCount + 1,
-            reason,
-            historySan: history,
-            lastMoveVerbose: verbose[verbose.length - 1],
-          });
+          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
         }
         return true;
       }
 
       scheduleBotMove(async () => {
         await makeBotMove(bot.difficulty);
-        
         if (isGameOver()) {
           const { result, reason } = getGameResult();
           if (result) {
             setGameEnded(true);
             const verbose = getHistoryVerbose();
-            onGameEnd?.({
-              result,
-              moves: moveCount + 2,
-              reason,
-              historySan: history,
-              lastMoveVerbose: verbose[verbose.length - 1],
-            });
+            onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
           }
         }
       }, 600 + Math.random() * 400);
 
       return true;
     }
-
     return false;
   }, [
-    isPlayerTurn, 
-    gameEnded, 
-    makeMove, 
-    onMove, 
-    isGameOver, 
-    getGameResult, 
-    onGameEnd, 
-    moveCount,
-    scheduleBotMove,
-    makeBotMove,
-    bot.difficulty,
-    history,
-    getHistoryVerbose,
-    isAtLatestPosition
+    isPlayerTurn, gameEnded, makeMove, onMove,
+    isGameOver, getGameResult, onGameEnd, moveCount,
+    scheduleBotMove, makeBotMove, bot.difficulty,
+    history, getHistoryVerbose, isAtLatestPosition,
   ]);
 
-  // Función para verificar si una pieza es arrastrable
   const canDragPiece = (args: { isSparePiece: boolean; piece: any; square: string | null }) => {
     if (!args.square) return false;
     const piece = args.piece;
-    return !gameEnded && 
-           isPlayerTurn && 
-           isAtLatestPosition() &&
-           piece && 
-           piece.pieceType && 
-           piece.pieceType.startsWith(playerColor);
+    return !gameEnded &&
+      isPlayerTurn &&
+      isAtLatestPosition() &&
+      piece &&
+      piece.pieceType &&
+      piece.pieceType.startsWith(playerColor);
   };
 
-  // Colores personalizados del tablero (modo oscuro)
   const boardStyle = {
     borderRadius: '8px',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
   };
-
   const darkSquareStyle = { backgroundColor: '#4a5568' };
   const lightSquareStyle = { backgroundColor: '#a0aec0' };
 
-  // Opciones del tablero
   const chessboardOptions = {
     position: fen,
     boardOrientation: (playerColor === 'w' ? 'white' : 'black') as 'white' | 'black',
@@ -321,7 +281,6 @@ export function ChessBoard({
 
       {/* Ventaja de material */}
       {moveCount > 0 && !gameEnded && (() => {
-        // playerColor 'w' means player is white: positive advantage favors player
         const playerAdv = playerColor === 'w' ? materialAdvantage : -materialAdvantage;
         if (playerAdv === 0) return (
           <div className="flex items-center justify-center mb-2 text-xs text-gray-400">
@@ -351,36 +310,15 @@ export function ChessBoard({
             ¡JAQUE!
           </div>
         )}
-
-        {/* Anotación del último movimiento */}
-        {lastMoveAnnotation && !gameEnded && (() => {
-          const info = ANNOTATION_INFO[lastMoveAnnotation];
-          return (
-            <div
-              className={`absolute top-2 right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg shadow-lg font-bold text-sm pointer-events-none ${info.color}`}
-              style={{ animation: 'fadeInScale 0.3s ease-out' }}
-            >
-              <span>{info.symbol}</span>
-              <span>{info.label}</span>
-            </div>
-          );
-        })()}
       </div>
-      <style>{`
-        @keyframes fadeInScale {
-          0% { opacity: 0; transform: scale(0.7); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
 
       {/* Controles */}
       <div className="flex justify-center mt-4 gap-3 flex-wrap">
-        {/* Navegación de movimientos */}
         <div className="flex items-center gap-2">
           <button
             onClick={goBack}
             disabled={!canGoBack()}
-            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed 
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed
                        text-white rounded-lg font-medium transition-colors flex items-center gap-2"
             title="Movimiento anterior"
           >
@@ -389,7 +327,7 @@ export function ChessBoard({
           <button
             onClick={goForward}
             disabled={!canGoForward()}
-            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed 
+            className="px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed
                        text-white rounded-lg font-medium transition-colors flex items-center gap-2"
             title="Siguiente movimiento"
           >
@@ -408,7 +346,7 @@ export function ChessBoard({
         )}
         <button
           onClick={() => setShowMoveHistory(!showMoveHistory)}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg 
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg
                      font-medium transition-colors flex items-center gap-2"
         >
           <List className="w-4 h-4" />
@@ -416,10 +354,10 @@ export function ChessBoard({
         </button>
       </div>
 
-      {/* Historial de movimientos */}
+      {/* Historial de movimientos con barras de calidad */}
       {showMoveHistory && (
-        <div className="mt-4 bg-gray-800 rounded-lg p-4 max-h-48 overflow-y-auto">
-          <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+        <div className="mt-4 bg-gray-800 rounded-lg p-4 max-h-64 overflow-y-auto">
+          <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
             <List className="w-4 h-4" />
             Historial de Movimientos
           </h4>
@@ -432,26 +370,68 @@ export function ChessBoard({
                 const blackIdx = movePairIdx * 2 + 1;
                 const whiteMove = history[whiteIdx];
                 const blackMove = history[blackIdx];
-                const whiteAnn = moveAnnotations[whiteIdx];
-                const blackAnn = moveAnnotations[blackIdx];
+                const whiteAnn = moveAnnotations[whiteIdx] ?? null;
+                const blackAnn = moveAnnotations[blackIdx] ?? null;
                 return (
                   <div
                     key={movePairIdx}
-                    className="flex items-center gap-1 p-2 rounded bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
+                    className="flex items-center gap-2 p-1.5 rounded bg-gray-900/50"
                   >
-                    <span className="text-gray-500 font-medium w-6 shrink-0">{movePairIdx + 1}.</span>
-                    <span className="text-white flex-1">{whiteMove || '-'}</span>
-                    {whiteAnn && (
-                      <span className={`text-xs px-1 rounded font-bold shrink-0 ${ANNOTATION_INFO[whiteAnn].color}`}>
-                        {ANNOTATION_INFO[whiteAnn].symbol}
-                      </span>
-                    )}
-                    <span className="text-gray-300 flex-1">{blackMove || '-'}</span>
-                    {blackAnn && (
-                      <span className={`text-xs px-1 rounded font-bold shrink-0 ${ANNOTATION_INFO[blackAnn].color}`}>
-                        {ANNOTATION_INFO[blackAnn].symbol}
-                      </span>
-                    )}
+                    {/* Número de jugada */}
+                    <span className="text-gray-500 font-medium w-5 shrink-0 text-xs">{movePairIdx + 1}.</span>
+
+                    {/* Movimiento blancas */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1 mb-0.5">
+                        <span className="text-white text-xs font-medium">{whiteMove || '-'}</span>
+                        {whiteAnn && (
+                          <span className="text-xs text-gray-400" title={ANNOTATION_BAR[whiteAnn].label}>
+                            {ANNOTATION_BAR[whiteAnn].symbol}
+                          </span>
+                        )}
+                      </div>
+                      <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                        {whiteAnn ? (
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${ANNOTATION_BAR[whiteAnn].color}`}
+                            style={{ width: `${ANNOTATION_BAR[whiteAnn].width}%` }}
+                          />
+                        ) : (
+                          <div className="h-full w-0" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Separador */}
+                    <div className="w-px h-6 bg-gray-700 shrink-0" />
+
+                    {/* Movimiento negras */}
+                    <div className="flex-1 min-w-0">
+                      {blackMove ? (
+                        <>
+                          <div className="flex items-center justify-between gap-1 mb-0.5">
+                            <span className="text-gray-300 text-xs font-medium">{blackMove}</span>
+                            {blackAnn && (
+                              <span className="text-xs text-gray-400" title={ANNOTATION_BAR[blackAnn].label}>
+                                {ANNOTATION_BAR[blackAnn].symbol}
+                              </span>
+                            )}
+                          </div>
+                          <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                            {blackAnn ? (
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${ANNOTATION_BAR[blackAnn].color}`}
+                                style={{ width: `${ANNOTATION_BAR[blackAnn].width}%` }}
+                              />
+                            ) : (
+                              <div className="h-full w-0" />
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-gray-600 text-xs">—</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -472,9 +452,7 @@ export function ChessBoard({
               borderColor: isWin ? '#16a34a' : isDraw ? '#64748b' : '#dc2626',
             }}
           >
-            <p className="text-3xl mb-1">
-              {isWin ? '🎉' : isDraw ? '🤝' : '😔'}
-            </p>
+            <p className="text-3xl mb-1">{isWin ? '🎉' : isDraw ? '🤝' : '😔'}</p>
             <p className="text-2xl font-bold text-white mb-1">
               {isWin ? '¡Victoria!' : isDraw ? 'Tablas' : 'Derrota'}
             </p>
