@@ -401,6 +401,10 @@ export function useChampionshipState() {
       next = simulateRemainingMatchesForCurrentRound(next);
       if (isCurrentRoundComplete(next)) {
         next = advanceRound(next);
+        // Generar pairings de la nueva ronda inmediatamente
+        if (!next.completed) {
+          next = generatePairingsForCurrentRound(next);
+        }
       }
       persist(next);
       return next;

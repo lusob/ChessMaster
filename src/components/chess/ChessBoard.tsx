@@ -383,13 +383,6 @@ export function ChessBoard({
           <List className="w-4 h-4" />
           Movimientos
         </button>
-        <button
-          onClick={handleReset}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg 
-                     font-medium transition-colors flex items-center gap-2"
-        >
-          <span>🔄</span> Nueva partida
-        </button>
       </div>
 
       {/* Historial de movimientos */}
