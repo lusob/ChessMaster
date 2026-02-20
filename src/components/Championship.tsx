@@ -99,8 +99,8 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
             <Trophy className="w-12 h-12 mx-auto mb-3 text-yellow-400" />
             <h3 className="text-xl font-bold text-white mb-2">Modo Campeonato</h3>
             <p className="text-gray-400 text-sm">
-              Compite contra 39 bots en un torneo tipo suizo de 7 rondas. Cada ronda te enfrentarás
-              a un oponente de nivel similar según tu progreso.
+              Torneo suizo de 7 rondas al estilo del Campeonato de Asturias. 40 jugadores
+              repartidos en tres grupos: Debutantes, Intermedios y Avanzados.
             </p>
           </div>
 
@@ -116,6 +116,18 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">Sistema</span>
               <span className="text-white font-medium">Suizo</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">😅 Debutantes</span>
+              <span className="text-green-400 font-medium">ELO 100–499</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">🧐 Intermedios</span>
+              <span className="text-yellow-400 font-medium">ELO 500–899</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-400">🏆 Avanzados</span>
+              <span className="text-red-400 font-medium">ELO 900–1500</span>
             </div>
           </div>
         </div>

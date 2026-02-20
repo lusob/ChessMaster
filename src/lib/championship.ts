@@ -14,6 +14,28 @@ function expectedScore(eloA: number, eloB: number) {
   return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
 }
 
+// Grupos de jugadores al estilo del Campeonato de Asturias
+const DEBUT_NAMES = [
+  'Alumno Ansioso', 'Peón Perdido', 'Rey Torpe', 'Alfil Asustado', 'Torre Tímida',
+  'Caballo Cojo', 'Gambito Fallido', 'Enroque Olvidado', 'Jaque Novato', 'Apertura Caótica',
+  'Blancas Despistadas', 'Negras Confundidas', 'Captura Accidental',
+];
+const DEBUT_EMOJIS = ['😅', '🐣', '🤓', '😬', '🐢', '😵', '🫣', '🙈', '🐥', '😟', '🤔', '😓', '🐌'];
+
+const MID_NAMES = [
+  'Candidato Astuto', 'Jugador Sólido', 'Defensa Tenaz', 'Ataque Pausado', 'Peón Pasado',
+  'Mediojuego Firme', 'Torres Activas', 'Alfiles Cruzados', 'Caballo Bien Puesto', 'Táctica Básica',
+  'Gambito Aceptado', 'Siciliana Menor', 'Francesa Discreta',
+];
+const MID_EMOJIS = ['🧐', '🤨', '🎯', '🔍', '🧩', '⚡', '🛡️', '⚔️', '🎲', '🔧', '🦊', '🐺', '🦉'];
+
+const ADV_NAMES = [
+  'Maestro Implacable', 'Gran Táctico', 'Estratega Supremo', 'Rey del Final', 'Ataque Brillante',
+  'Combinación Mortal', 'Sacrificio Elegante', 'Zugzwang Experto', 'Maniobra Profunda', 'Variante Aguda',
+  'Asturiano Feroz', 'Campeón Regional', 'Élite Imparable',
+];
+const ADV_EMOJIS = ['🏆', '🦁', '👑', '🐉', '🔥', '🧠', '🦾', '🥷', '💎', '⚡', '🦅', '🌟', '💀'];
+
 function randomEmoji(i: number) {
   const emojis = ['🤖', '🧠', '🦾', '🧊', '🔥', '🧙‍♂️', '🥷', '🦉', '🐉', '🦊', '🐺', '🦁', '🐼'];
   return emojis[i % emojis.length];
@@ -24,19 +46,61 @@ function colorFromIndex(i: number) {
   return `hsl(${hue}, 70%, 50%)`;
 }
 
+// Genera bots distribuidos en tres grupos al estilo del Campeonato de Asturias:
+// Debutantes (ELO 100-499), Intermedios (ELO 500-899), Avanzados (ELO 900-1500)
+function createGroupedBots(botCount: number): Array<{ name: string; emoji: string; elo: number }> {
+  // Distribución: ~35% debutantes, ~35% intermedios, ~30% avanzados
+  const nDebut = Math.round(botCount * 0.35);
+  const nMid = Math.round(botCount * 0.35);
+  const nAdv = botCount - nDebut - nMid;
+
+  const bots: Array<{ name: string; emoji: string; elo: number }> = [];
+
+  // Debutantes: ELO 100–499, escalonados
+  for (let i = 0; i < nDebut; i++) {
+    const t = nDebut <= 1 ? 0 : i / (nDebut - 1);
+    const base = 100 + t * 399;
+    const jitter = (Math.random() - 0.5) * 60;
+    const elo = Math.round(clamp(base + jitter, 100, 499));
+    bots.push({ name: DEBUT_NAMES[i % DEBUT_NAMES.length], emoji: DEBUT_EMOJIS[i % DEBUT_EMOJIS.length], elo });
+  }
+
+  // Intermedios: ELO 500–899, escalonados
+  for (let i = 0; i < nMid; i++) {
+    const t = nMid <= 1 ? 0 : i / (nMid - 1);
+    const base = 500 + t * 399;
+    const jitter = (Math.random() - 0.5) * 60;
+    const elo = Math.round(clamp(base + jitter, 500, 899));
+    bots.push({ name: MID_NAMES[i % MID_NAMES.length], emoji: MID_EMOJIS[i % MID_EMOJIS.length], elo });
+  }
+
+  // Avanzados: ELO 900–1500, escalonados
+  for (let i = 0; i < nAdv; i++) {
+    const t = nAdv <= 1 ? 0 : i / (nAdv - 1);
+    const base = 900 + t * 600;
+    const jitter = (Math.random() - 0.5) * 60;
+    const elo = Math.round(clamp(base + jitter, 900, 1500));
+    bots.push({ name: ADV_NAMES[i % ADV_NAMES.length], emoji: ADV_EMOJIS[i % ADV_EMOJIS.length], elo });
+  }
+
+  // Mezclar dentro de cada grupo para que las mesas no sean siempre las mismas
+  for (let i = bots.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bots[i], bots[j]] = [bots[j], bots[i]];
+  }
+
+  return bots;
+}
+
 export function createInitialChampionshipState(params: {
   userProfile: PlayerProfile;
   totalRounds?: number;
   totalPlayers?: number;
-  botEloMin?: number;
-  botEloMax?: number;
 }): ChampionshipState {
   const {
     userProfile,
     totalRounds = 7,
     totalPlayers = 40,
-    botEloMin = 200,
-    botEloMax = 1500,
   } = params;
 
   const userId = userProfile.id;
@@ -55,23 +119,20 @@ export function createInitialChampionshipState(params: {
   });
 
   const botCount = totalPlayers - 1;
-  for (let i = 0; i < botCount; i++) {
-    const t = botCount <= 1 ? 0 : i / (botCount - 1);
-    const base = botEloMin + t * (botEloMax - botEloMin);
-    const jitter = (Math.random() - 0.5) * 60; // ligera variación
-    const elo = Math.round(clamp(base + jitter, botEloMin, botEloMax));
+  const groupedBots = createGroupedBots(botCount);
 
+  groupedBots.forEach((bot, i) => {
     players.push({
       id: `champ-bot-${i + 1}`,
-      name: `Bot ${i + 1}`,
-      emoji: randomEmoji(i),
-      elo,
+      name: bot.name,
+      emoji: bot.emoji,
+      elo: bot.elo,
       isUser: false,
       points: 0,
       buchholz: 0,
       opponents: [],
     });
-  }
+  });
 
   return {
     seasonId: `season-${Date.now()}`,
@@ -287,7 +348,8 @@ export function advanceRound(state: ChampionshipState): ChampionshipState {
 }
 
 export function championshipPlayerToBot(player: ChampionshipPlayer): Bot {
-  const difficulty = clamp(Math.round((player.elo - 200) / 140) + 1, 1, 10);
+  // ELO 100 → difficulty 1, ELO 1500 → difficulty 10, lineal
+  const difficulty = clamp(Math.round(((player.elo - 100) / 1400) * 9) + 1, 1, 10);
   return {
     id: player.id,
     name: player.name,
