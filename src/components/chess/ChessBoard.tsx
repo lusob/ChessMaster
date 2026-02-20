@@ -4,7 +4,7 @@ import type { Square } from 'chess.js';
 import { useChessEngine, useBotTimer } from '@/hooks/useChessEngine';
 import type { Bot } from '@/types';
 import type { Move } from '@/hooks/useChessEngine';
-import { Loader2, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, List, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
 
 interface ChessBoardProps {
   bot: Bot;
@@ -41,6 +41,7 @@ export function ChessBoard({
     resetGame,
     goBack,
     goForward,
+    goToLatest,
     isAtLatestPosition,
     canGoBack,
     canGoForward,
@@ -365,9 +366,14 @@ export function ChessBoard({
           </button>
         </div>
         {!isAtLatestPosition() && (
-          <div className="px-3 py-2 bg-yellow-600/20 border border-yellow-500/50 text-yellow-400 rounded-lg text-sm">
-            Navegando movimientos anteriores
-          </div>
+          <button
+            onClick={goToLatest}
+            className="px-3 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-semibold flex items-center gap-1 transition-colors"
+            title="Volver a la posición actual"
+          >
+            <Radio className="w-3 h-3" />
+            En vivo
+          </button>
         )}
         <button
           onClick={() => setShowMoveHistory(!showMoveHistory)}

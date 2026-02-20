@@ -547,6 +547,12 @@ export function useChessEngine() {
     syncState();
   }, [syncState, setHistoryIndex]);
 
+  // Ir directamente a la última posición
+  const goToLatest = useCallback(() => {
+    setHistoryIndex(-1);
+    syncState();
+  }, [syncState, setHistoryIndex]);
+
   // Verificar si estamos en la última posición (usa ref para ser síncrono)
   const isAtLatestPosition = useCallback(() => {
     return historyIndexRef.current === -1;
@@ -589,6 +595,7 @@ export function useChessEngine() {
     undo,
     goBack,
     goForward,
+    goToLatest,
     isAtLatestPosition,
     canGoBack,
     canGoForward,
