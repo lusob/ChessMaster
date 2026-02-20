@@ -3,8 +3,17 @@ import { Chessboard } from 'react-chessboard';
 import type { Square } from 'chess.js';
 import { useChessEngine, useBotTimer } from '@/hooks/useChessEngine';
 import type { Bot } from '@/types';
-import type { Move } from '@/hooks/useChessEngine';
+import type { Move, MoveAnnotation } from '@/hooks/useChessEngine';
 import { Loader2, List, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
+
+const ANNOTATION_INFO: Record<MoveAnnotation, { label: string; symbol: string; color: string }> = {
+  brilliant:  { label: 'Brillante',   symbol: '✨', color: 'bg-cyan-600 text-white' },
+  excellent:  { label: 'Excelente',   symbol: '!!', color: 'bg-green-600 text-white' },
+  good:       { label: 'Buena',       symbol: '!',  color: 'bg-green-700 text-white' },
+  inaccuracy: { label: 'Imprecisión', symbol: '?!', color: 'bg-yellow-600 text-white' },
+  mistake:    { label: 'Error',       symbol: '?',  color: 'bg-orange-600 text-white' },
+  blunder:    { label: 'Blunder',     symbol: '??', color: 'bg-red-600 text-white' },
+};
 
 interface ChessBoardProps {
   bot: Bot;
@@ -32,6 +41,8 @@ export function ChessBoard({
     isCheck,
     moveCount,
     materialAdvantage,
+    lastMoveAnnotation,
+    moveAnnotations,
     getLegalMoves,
     makeMove,
     makeBotMove,
@@ -334,13 +345,33 @@ export function ChessBoard({
 
         {/* Indicador de jaque */}
         {isCheck && !gameEnded && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
                           bg-red-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg
                           animate-pulse pointer-events-none">
             ¡JAQUE!
           </div>
         )}
+
+        {/* Anotación del último movimiento */}
+        {lastMoveAnnotation && !gameEnded && (() => {
+          const info = ANNOTATION_INFO[lastMoveAnnotation];
+          return (
+            <div
+              className={`absolute top-2 right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg shadow-lg font-bold text-sm pointer-events-none ${info.color}`}
+              style={{ animation: 'fadeInScale 0.3s ease-out' }}
+            >
+              <span>{info.symbol}</span>
+              <span>{info.label}</span>
+            </div>
+          );
+        })()}
       </div>
+      <style>{`
+        @keyframes fadeInScale {
+          0% { opacity: 0; transform: scale(0.7); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
 
       {/* Controles */}
       <div className="flex justify-center mt-4 gap-3 flex-wrap">
@@ -397,16 +428,30 @@ export function ChessBoard({
           ) : (
             <div className="space-y-1 text-sm">
               {Array.from({ length: Math.ceil(history.length / 2) }).map((_, movePairIdx) => {
-                const whiteMove = history[movePairIdx * 2];
-                const blackMove = history[movePairIdx * 2 + 1];
+                const whiteIdx = movePairIdx * 2;
+                const blackIdx = movePairIdx * 2 + 1;
+                const whiteMove = history[whiteIdx];
+                const blackMove = history[blackIdx];
+                const whiteAnn = moveAnnotations[whiteIdx];
+                const blackAnn = moveAnnotations[blackIdx];
                 return (
                   <div
                     key={movePairIdx}
-                    className="flex items-center gap-2 p-2 rounded bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
+                    className="flex items-center gap-1 p-2 rounded bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
                   >
-                    <span className="text-gray-500 font-medium w-8">{movePairIdx + 1}.</span>
+                    <span className="text-gray-500 font-medium w-6 shrink-0">{movePairIdx + 1}.</span>
                     <span className="text-white flex-1">{whiteMove || '-'}</span>
+                    {whiteAnn && (
+                      <span className={`text-xs px-1 rounded font-bold shrink-0 ${ANNOTATION_INFO[whiteAnn].color}`}>
+                        {ANNOTATION_INFO[whiteAnn].symbol}
+                      </span>
+                    )}
                     <span className="text-gray-300 flex-1">{blackMove || '-'}</span>
+                    {blackAnn && (
+                      <span className={`text-xs px-1 rounded font-bold shrink-0 ${ANNOTATION_INFO[blackAnn].color}`}>
+                        {ANNOTATION_INFO[blackAnn].symbol}
+                      </span>
+                    )}
                   </div>
                 );
               })}

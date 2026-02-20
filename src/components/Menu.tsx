@@ -1,5 +1,5 @@
 import type { GameMode } from '@/types';
-import { Bot, Trophy, Settings, BarChart3, User, ChevronRight, Swords, Crown } from 'lucide-react';
+import { Trophy, Settings, BarChart3, User, ChevronRight, Swords, Crown } from 'lucide-react';
 
 interface MenuProps {
   onSelectMode: (mode: GameMode) => void;

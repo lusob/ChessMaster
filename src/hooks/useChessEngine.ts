@@ -3,7 +3,7 @@ import { Chess } from 'chess.js';
 import type { Square } from 'chess.js';
 import { getStockfishEngine, waitForStockfishReady } from '@/workers/stockfishWorkerWrapper';
 
-export type GameStatus = 
+export type GameStatus =
   | 'playing'
   | 'checkmate'
   | 'stalemate'
@@ -11,6 +11,14 @@ export type GameStatus =
   | 'insufficient_material'
   | 'fifty_moves'
   | 'draw';
+
+export type MoveAnnotation =
+  | 'brilliant'   // ✨ Jugada sorprendente y óptima
+  | 'excellent'   // !! Excelente
+  | 'good'        // ! Buena
+  | 'inaccuracy'  // ?! Imprecisión
+  | 'mistake'     // ? Error
+  | 'blunder';    // ?? Blunder
 
 export interface Move {
   from: Square;
@@ -186,6 +194,20 @@ function findBestMoveLight(game: Chess, moves: any[]): any {
   return bestMove;
 }
 
+// Clasifica la calidad de un movimiento basándose en la diferencia de score de Stockfish
+// scoreBefore: centipawns desde el punto de vista del jugador que acaba de mover (antes de mover)
+// scoreAfter: centipawns desde el punto de vista del jugador que acaba de mover (después de mover, negado para compensar que cambia turno)
+// La diferencia positiva significa que el movimiento fue mejor que lo esperado
+function classifyMove(scoreBefore: number, scoreAfter: number): MoveAnnotation {
+  const delta = scoreAfter - scoreBefore; // positivo = mejoró la posición
+  if (delta >= 50) return 'brilliant';
+  if (delta >= 10) return 'excellent';
+  if (delta >= -20) return 'good';
+  if (delta >= -100) return 'inaccuracy';
+  if (delta >= -300) return 'mistake';
+  return 'blunder';
+}
+
 // Calcula la ventaja de material desde la perspectiva de las blancas
 function getMaterialAdvantage(game: Chess): number {
   let score = 0;
@@ -211,6 +233,8 @@ export function useChessEngine() {
   const [isCheck, setIsCheck] = useState(false);
   const [moveCount, setMoveCount] = useState(0);
   const [materialAdvantage, setMaterialAdvantage] = useState(0); // >0 blancas ganan, <0 negras ganan
+  const [lastMoveAnnotation, setLastMoveAnnotation] = useState<MoveAnnotation | null>(null);
+  const [moveAnnotations, setMoveAnnotations] = useState<(MoveAnnotation | null)[]>([]); // per-move annotations
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1); // -1 = posición actual, >=0 = navegando
   const historyIndexRef = useRef(-1); // ref síncrono para syncState
   const stockfishRef = useRef<ReturnType<typeof getStockfishEngine> | null>(null);
@@ -314,6 +338,8 @@ export function useChessEngine() {
   const resetGame = useCallback(() => {
     gameRef.current = new Chess();
     setHistoryIndex(-1);
+    setLastMoveAnnotation(null);
+    setMoveAnnotations([]);
     syncState();
   }, [syncState, setHistoryIndex]);
 
@@ -339,12 +365,12 @@ export function useChessEngine() {
   const makeMove = useCallback((move: Move): boolean => {
     // Solo permitir movimientos si estamos en la posición actual
     if (historyIndexRef.current !== -1) {
-      // Si estamos navegando, volver a la posición actual primero
       setHistoryIndex(-1);
     }
-    
+
     const game = gameRef.current;
-    
+    const fenBefore = game.fen();
+
     try {
       const result = game.move({
         from: move.from,
@@ -354,6 +380,33 @@ export function useChessEngine() {
 
       if (result) {
         syncState();
+        setLastMoveAnnotation(null);
+
+        // Análisis asíncrono de calidad del movimiento
+        const engine = stockfishRef.current;
+        const moveIndex = game.history().length - 1; // index of the move just made
+        if (engine?.ready) {
+          const fenAfter = game.fen();
+          (async () => {
+            try {
+              // Score antes (desde perspectiva de quien movió)
+              const scoreBefore = await engine.analyzePosition(fenBefore);
+              // Score después (desde perspectiva del oponente, negamos para comparar)
+              const scoreAfterOpponent = await engine.analyzePosition(fenAfter);
+              const scoreAfter = -scoreAfterOpponent;
+              const annotation = classifyMove(scoreBefore, scoreAfter);
+              setLastMoveAnnotation(annotation);
+              setMoveAnnotations((prev) => {
+                const next = [...prev];
+                next[moveIndex] = annotation;
+                return next;
+              });
+            } catch {
+              // Ignorar errores de análisis
+            }
+          })();
+        }
+
         return true;
       }
       return false;
@@ -584,6 +637,8 @@ export function useChessEngine() {
     isCheck,
     moveCount,
     materialAdvantage,
+    lastMoveAnnotation,
+    moveAnnotations,
     resetGame,
     loadFen,
     getLegalMoves,
