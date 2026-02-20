@@ -547,10 +547,10 @@ export function useChessEngine() {
     syncState();
   }, [syncState, setHistoryIndex]);
 
-  // Verificar si estamos en la última posición
+  // Verificar si estamos en la última posición (usa ref para ser síncrono)
   const isAtLatestPosition = useCallback(() => {
-    return currentHistoryIndex === -1;
-  }, [currentHistoryIndex]);
+    return historyIndexRef.current === -1;
+  }, []);
 
   // Verificar si podemos ir hacia atrás
   const canGoBack = useCallback(() => {
