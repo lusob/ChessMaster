@@ -1,15 +1,15 @@
 import { useMemo, useEffect } from 'react';
-import type { Bot, ChampionshipState } from '@/types';
+import type { Bot } from '@/types';
 import { useChampionshipState } from '@/hooks/useStorage';
 import {
   getUserPairingForRound,
   championshipPlayerToBot,
   isCurrentRoundComplete,
 } from '@/lib/championship';
-import { ChevronLeft, Trophy, Play, Users, Award, TrendingUp } from 'lucide-react';
+import { ChevronLeft, Trophy, Play, Award, TrendingUp } from 'lucide-react';
 
 interface ChampionshipProps {
-  userProfile: { id: string; name: string; elo: number };
+  userProfile: { id: string; name: string; elo: number; createdAt: number };
   onSelectBot: (bot: Bot) => void;
   onBack: () => void;
 }
@@ -21,7 +21,6 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
     startNew,
     reset,
     ensureCurrentRoundPairings,
-    submitUserResultAndSimulateRound,
   } = useChampionshipState();
 
   // Asegurar que los emparejamientos de la ronda actual existan

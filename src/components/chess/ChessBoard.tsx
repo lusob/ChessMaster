@@ -4,7 +4,7 @@ import type { Square } from 'chess.js';
 import { useChessEngine, useBotTimer } from '@/hooks/useChessEngine';
 import type { Bot } from '@/types';
 import type { Move } from '@/hooks/useChessEngine';
-import { Loader2, RotateCcw, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, List, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ChessBoardProps {
   bot: Bot;
@@ -38,7 +38,6 @@ export function ChessBoard({
     getGameResult,
     getHistoryVerbose,
     resetGame,
-    undo,
     goBack,
     goForward,
     isAtLatestPosition,
@@ -59,22 +58,6 @@ export function ChessBoard({
     setMoveFrom(null);
     setOptionSquares({});
   }, [resetGame]);
-
-  // Handle undo - deshacer último par de movimientos (jugador + bot)
-  const handleUndo = useCallback(() => {
-    if (gameEnded || isThinking || moveCount === 0) return;
-    
-    // Si es turno del jugador, significa que el último movimiento fue del bot
-    // Deshacer bot primero, luego jugador
-    if (isPlayerTurn) {
-      undo(); // Deshacer movimiento del bot
-      undo(); // Deshacer movimiento del jugador
-    } else {
-      // Si es turno del bot, el último movimiento fue del jugador
-      // Solo deshacer el movimiento del jugador (el bot aún no ha movido)
-      undo();
-    }
-  }, [undo, gameEnded, isThinking, isPlayerTurn, moveCount]);
 
   // Manejar clic en pieza (para móvil)
   const onPieceClick = useCallback((args: { isSparePiece: boolean; piece: any; square: string | null }) => {
