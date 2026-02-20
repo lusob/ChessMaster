@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#111827"/>
+  <!-- Chess king piece (simplified) -->
+  <!-- Crown top cross -->
+  <rect x="240" y="60" width="32" height="80" rx="8" fill="#f59e0b"/>
+  <rect x="208" y="84" width="96" height="32" rx="8" fill="#f59e0b"/>
+  <!-- Crown base -->
+  <rect x="184" y="152" width="144" height="32" rx="8" fill="#fbbf24"/>
+  <!-- King body -->
+  <path d="M192 184 L176 320 L336 320 L320 184 Z" fill="#f59e0b" rx="8"/>
+  <!-- King base -->
+  <rect x="160" y="320" width="192" height="36" rx="10" fill="#fbbf24"/>
+  <rect x="144" y="356" width="224" height="40" rx="12" fill="#f59e0b"/>
+  <!-- Highlight -->
+  <ellipse cx="230" cy="220" rx="20" ry="30" fill="rgba(255,255,255,0.15)"/>
+</svg>
