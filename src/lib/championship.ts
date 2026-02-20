@@ -36,10 +36,6 @@ const ADV_NAMES = [
 ];
 const ADV_EMOJIS = ['🏆', '🦁', '👑', '🐉', '🔥', '🧠', '🦾', '🥷', '💎', '⚡', '🦅', '🌟', '💀'];
 
-function randomEmoji(i: number) {
-  const emojis = ['🤖', '🧠', '🦾', '🧊', '🔥', '🧙‍♂️', '🥷', '🦉', '🐉', '🦊', '🐺', '🦁', '🐼'];
-  return emojis[i % emojis.length];
-}
 
 function colorFromIndex(i: number) {
   const hue = (i * 37) % 360;
