@@ -123,7 +123,7 @@ export function Menu({ onSelectMode, playerName, playerElo }: MenuProps) {
 
       {/* Footer */}
       <div className="mt-4 text-center text-xs text-gray-500">
-        <p>Desarrollado con chess.js, react-chessboard y Stockfish</p>
+        <p>Hecho con ❤️ para los alumnos del club de ajedrez Siero</p>
       </div>
     </div>
   );

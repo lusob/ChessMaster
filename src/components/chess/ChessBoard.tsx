@@ -285,7 +285,7 @@ export function ChessBoard({
   };
 
   return (
-    <div className="w-full max-w-lg mx-auto">
+    <div className="w-full max-w-2xl mx-auto">
       {/* Info del bot */}
       <div className="flex items-center justify-between mb-2 bg-gray-800 rounded-lg p-3">
         <div className="flex items-center gap-3">

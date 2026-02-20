@@ -145,7 +145,7 @@ function App() {
       case 'game':
         if (currentBot) {
           return (
-            <div className="px-4 py-6">
+            <div className="max-w-2xl mx-auto px-4 py-6">
               <div className="flex items-center gap-4 mb-4">
                 <button
                   onClick={() => handleBack(returnMode)}
