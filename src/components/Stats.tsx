@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
-import type { PlayerStats } from '@/types';
-import { ChevronLeft, TrendingUp, TrendingDown, Minus, ChevronDown } from 'lucide-react';
+import type { GameResult, PlayerStats } from '@/types';
+import { ChevronLeft, TrendingUp, TrendingDown, Minus, ChevronDown, Eye, X } from 'lucide-react';
+import { Chessboard } from 'react-chessboard';
+import { Chess } from 'chess.js';
 import {
   LineChart,
   Line,
@@ -24,6 +26,8 @@ const PAGE_SIZE = 10;
 export function Stats({ stats, onBack }: StatsProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filterResult, setFilterResult] = useState<'all' | 'win' | 'loss' | 'draw'>('all');
+  const [selectedGame, setSelectedGame] = useState<GameResult | null>(null);
+  const [replayIndex, setReplayIndex] = useState(0);
 
   const eloData = useMemo(() => {
     if (!stats?.eloHistory) return [];
@@ -53,6 +57,16 @@ export function Stats({ stats, onBack }: StatsProps) {
     if (filterResult === 'all') return stats.games;
     return stats.games.filter((g) => g.result === filterResult);
   }, [stats?.games, filterResult]);
+
+  const replayFen = useMemo(() => {
+    if (!selectedGame?.historySan) return new Chess().fen();
+    const chess = new Chess();
+    const moves = selectedGame.historySan.slice(0, replayIndex);
+    for (const san of moves) {
+      try { chess.move(san); } catch { break; }
+    }
+    return chess.fen();
+  }, [selectedGame, replayIndex]);
 
   const visibleGames = filteredGames.slice(0, visibleCount);
   const hasMore = visibleCount < filteredGames.length;
@@ -238,19 +252,30 @@ export function Stats({ stats, onBack }: StatsProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right shrink-0 ml-2">
-                      <p className={`text-sm font-semibold ${
-                        game.result === 'win' ? 'text-green-400' :
-                        game.result === 'loss' ? 'text-red-400' : 'text-gray-400'
-                      }`}>
-                        {game.result === 'win' ? 'Victoria' : game.result === 'loss' ? 'Derrota' : 'Tablas'}
-                      </p>
-                      <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
-                        <span className={game.eloChange > 0 ? 'text-green-400' : game.eloChange < 0 ? 'text-red-400' : 'text-gray-400'}>
-                          {game.eloChange > 0 ? '+' : ''}{game.eloChange}
-                        </span>
-                        <span>·</span>
-                        <span>{game.moves} mov</span>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      {game.historySan && game.historySan.length > 0 && (
+                        <button
+                          onClick={() => { setSelectedGame(game); setReplayIndex(0); }}
+                          className="p-1.5 bg-gray-700 hover:bg-blue-600 rounded-lg transition-colors"
+                          title="Ver partida"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-gray-300" />
+                        </button>
+                      )}
+                      <div className="text-right">
+                        <p className={`text-sm font-semibold ${
+                          game.result === 'win' ? 'text-green-400' :
+                          game.result === 'loss' ? 'text-red-400' : 'text-gray-400'
+                        }`}>
+                          {game.result === 'win' ? 'Victoria' : game.result === 'loss' ? 'Derrota' : 'Tablas'}
+                        </p>
+                        <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+                          <span className={game.eloChange > 0 ? 'text-green-400' : game.eloChange < 0 ? 'text-red-400' : 'text-gray-400'}>
+                            {game.eloChange > 0 ? '+' : ''}{game.eloChange}
+                          </span>
+                          <span>·</span>
+                          <span>{game.moves} mov</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -270,6 +295,114 @@ export function Stats({ stats, onBack }: StatsProps) {
               )}
             </>
           )}
+        </div>
+      )}
+      {/* Replay overlay */}
+      {selectedGame && selectedGame.historySan && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-gray-900">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3 bg-gray-800 shrink-0">
+            <button
+              onClick={() => { setSelectedGame(null); setReplayIndex(0); }}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold truncate">vs {selectedGame.opponentName}</p>
+              <p className="text-xs text-gray-400">
+                {new Date(selectedGame.date).toLocaleDateString('es-ES')} ·{' '}
+                <span className={
+                  selectedGame.result === 'win' ? 'text-green-400' :
+                  selectedGame.result === 'loss' ? 'text-red-400' : 'text-gray-400'
+                }>
+                  {selectedGame.result === 'win' ? 'Victoria' : selectedGame.result === 'loss' ? 'Derrota' : 'Tablas'}
+                </span>
+              </p>
+            </div>
+            <span className="text-sm text-gray-400 shrink-0">
+              {replayIndex} / {selectedGame.historySan.length}
+            </span>
+          </div>
+
+          {/* Board */}
+          <div className="flex-1 flex items-center justify-center p-4 min-h-0">
+            <div className="w-full max-w-sm">
+              <Chessboard
+                options={{
+                  position: replayFen,
+                  allowDragging: false,
+                  animationDurationInMs: 100,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="shrink-0 px-4 pb-4">
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setReplayIndex(0)}
+                disabled={replayIndex === 0}
+                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+              >
+                &laquo; Inicio
+              </button>
+              <button
+                onClick={() => setReplayIndex((i) => Math.max(0, i - 1))}
+                disabled={replayIndex === 0}
+                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+              >
+                &lsaquo; Anterior
+              </button>
+              <button
+                onClick={() => setReplayIndex((i) => Math.min(selectedGame.historySan!.length, i + 1))}
+                disabled={replayIndex === selectedGame.historySan.length}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+              >
+                Siguiente &rsaquo;
+              </button>
+              <button
+                onClick={() => setReplayIndex(selectedGame.historySan!.length)}
+                disabled={replayIndex === selectedGame.historySan.length}
+                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+              >
+                Final &raquo;
+              </button>
+            </div>
+
+            {/* Move list */}
+            <div className="bg-gray-800 rounded-xl p-3 max-h-32 overflow-y-auto">
+              <div className="flex flex-wrap gap-1">
+                {selectedGame.historySan.reduce<{ moveNum: number; white: string; black?: string }[]>((pairs, san, i) => {
+                  if (i % 2 === 0) {
+                    pairs.push({ moveNum: Math.floor(i / 2) + 1, white: san });
+                  } else {
+                    pairs[pairs.length - 1].black = san;
+                  }
+                  return pairs;
+                }, []).map((pair) => (
+                  <span key={pair.moveNum} className="text-xs whitespace-nowrap">
+                    <span className="text-gray-500 mr-0.5">{pair.moveNum}.</span>
+                    <button
+                      onClick={() => setReplayIndex(pair.moveNum * 2 - 1)}
+                      className={`px-1 rounded ${replayIndex === pair.moveNum * 2 - 1 ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                    >
+                      {pair.white}
+                    </button>
+                    {pair.black && (
+                      <button
+                        onClick={() => setReplayIndex(pair.moveNum * 2)}
+                        className={`px-1 rounded ml-0.5 ${replayIndex === pair.moveNum * 2 ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                      >
+                        {pair.black}
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -221,6 +221,7 @@ export function usePlayerStats() {
     opponentName: string,
     moves: number,
     onEloUpdated?: (newElo: number) => void,
+    historySan?: string[],
   ) => {
     setStats((prev) => {
       if (!prev) return null;
@@ -235,6 +236,7 @@ export function usePlayerStats() {
         opponentName,
         date: Date.now(),
         moves,
+        ...(historySan && historySan.length > 0 ? { historySan } : {}),
       };
 
       const updatedStats: PlayerStats = {

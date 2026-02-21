@@ -543,8 +543,10 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
     const game = gameRef.current;
 
     if (game.isCheckmate()) {
-      // Si es turno de las blancas y hay jaque mate, ganan negras (bot)
-      const winner = game.turn() === 'w' ? 'loss' : 'win';
+      // Tras jaque mate, el turno es del bando que acaba de ser matado.
+      // Si el turno es del jugador, significa que le acaban de dar mate → derrota.
+      // Si el turno es del rival, el jugador dio el mate → victoria.
+      const winner = game.turn() === playerColorRef.current ? 'loss' : 'win';
       return { result: winner, reason: 'Jaque mate' };
     }
 

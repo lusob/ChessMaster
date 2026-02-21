@@ -28,6 +28,7 @@ export interface GameResult {
   opponentName: string;
   date: number;
   moves: number;
+  historySan?: string[]; // Movimientos en notación SAN para replay
 }
 
 export interface PlayerStats {

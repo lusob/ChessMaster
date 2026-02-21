@@ -63,7 +63,7 @@ function App() {
 
       addGameResult(payload.result, currentBot.elo, currentBot.name, payload.moves, (newElo) => {
         updateProfile({ elo: newElo });
-      });
+      }, payload.historySan);
 
       if (payload.result === 'win') {
         fireWinConfetti();
