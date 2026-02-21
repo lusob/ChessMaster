@@ -56,7 +56,7 @@ export function ChessBoard({
     isAtLatestPosition,
     canGoBack,
     canGoForward,
-  } = useChessEngine();
+  } = useChessEngine(playerColor);
 
   const { isThinking, scheduleBotMove } = useBotTimer();
   const [optionSquares, setOptionSquares] = useState<Record<string, React.CSSProperties>>({});

@@ -224,11 +224,14 @@ function getMaterialAdvantage(game: Chess): number {
   return score;
 }
 
-export function useChessEngine() {
+export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
+  const playerColorRef = useRef(playerColor);
+  playerColorRef.current = playerColor;
+
   const gameRef = useRef(new Chess()); // Juego completo (siempre tiene todos los movimientos)
   const [fen, setFen] = useState(gameRef.current.fen());
   const [history, setHistory] = useState<string[]>([]);
-  const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+  const [isPlayerTurn, setIsPlayerTurn] = useState(playerColor === 'w');
   const [status, setStatus] = useState<GameStatus>('playing');
   const [isCheck, setIsCheck] = useState(false);
   const [moveCount, setMoveCount] = useState(0);
@@ -284,7 +287,7 @@ export function useChessEngine() {
       }
       setFen(tempGame.fen());
       setHistory(tempGame.history());
-      setIsPlayerTurn(tempGame.turn() === 'w');
+      setIsPlayerTurn(tempGame.turn() === playerColorRef.current);
       setIsCheck(tempGame.isCheck());
       setMoveCount(tempGame.history().length);
       setMaterialAdvantage(getMaterialAdvantage(tempGame));
@@ -307,7 +310,7 @@ export function useChessEngine() {
       // Mostrar posición actual completa
       setFen(game.fen());
       setHistory(fullHistory);
-      setIsPlayerTurn(game.turn() === 'w');
+      setIsPlayerTurn(game.turn() === playerColorRef.current);
       setIsCheck(game.isCheck());
       setMoveCount(fullHistory.length);
       setMaterialAdvantage(getMaterialAdvantage(game));
