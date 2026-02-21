@@ -31,7 +31,7 @@ function App() {
     resetFixedBots,
   } = useBots();
   const { stats, isLoaded: statsLoaded, addGameResult } = usePlayerStats();
-  const { profile, isLoaded: profileLoaded, createProfile, updateProfile } = useProfile();
+  const { profile, isLoaded: profileLoaded, createProfile, updateProfile, resetAllData } = useProfile();
   const { achievements, processGameEnd } = useAchievements(stats);
   const { submitUserResultAndSimulateRound } = useChampionshipState();
 
@@ -215,6 +215,7 @@ function App() {
             profile={profile}
             onCreateProfile={createProfile}
             onUpdateProfile={updateProfile}
+            onResetAllData={resetAllData}
             onBack={() => handleBack('menu')}
             achievements={achievements}
           />

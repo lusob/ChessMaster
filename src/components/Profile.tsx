@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react';
 import type { Achievement, PlayerProfile } from '@/types';
-import { ChevronLeft, User, Check, Crown, Star, Award, Camera, Edit2, X } from 'lucide-react';
+import { ChevronLeft, User, Check, Crown, Star, Award, Camera, Edit2, X, Trash2, AlertTriangle } from 'lucide-react';
 
 interface ProfileProps {
   profile: PlayerProfile | null;
   onCreateProfile: (name: string) => void;
   onUpdateProfile: (updates: Partial<PlayerProfile>) => void;
+  onResetAllData: () => void;
   onBack: () => void;
   achievements?: Achievement[];
 }
@@ -23,11 +24,13 @@ export function Profile({
   profile,
   onCreateProfile,
   onUpdateProfile,
+  onResetAllData,
   onBack,
   achievements = [],
 }: ProfileProps) {
   const [createName, setCreateName] = useState('');
   const [editingName, setEditingName] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [nameValue, setNameValue] = useState(profile?.name || '');
   const [editingElo, setEditingElo] = useState(false);
   const [eloValue, setEloValue] = useState(String(profile?.elo ?? 1000));
@@ -255,7 +258,7 @@ export function Profile({
       </div>
 
       {/* Insignias */}
-      <div className="px-4 pt-4 pb-6 flex-1">
+      <div className="px-4 pt-4 pb-2 flex-1">
         <div className="bg-gray-800 rounded-2xl p-4">
           <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
             <Award className="w-5 h-5 text-yellow-400" />
@@ -292,6 +295,47 @@ export function Profile({
                     </span>
                   </div>
                 ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Zona de peligro */}
+      <div className="px-4 pt-2 pb-8">
+        <div className="border border-red-800/50 rounded-2xl p-4">
+          <h4 className="font-semibold text-red-400 mb-1 flex items-center gap-2 text-sm">
+            <AlertTriangle className="w-4 h-4" />
+            Zona de peligro
+          </h4>
+          <p className="text-gray-500 text-xs mb-3">
+            Borra todos tus datos: partidas, ELO, campeonatos, insignias y perfil. Esta acción es irreversible.
+          </p>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full py-2.5 border border-red-700 hover:bg-red-900/30 text-red-400 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Borrar todos los datos
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-red-400 text-xs font-semibold text-center">¿Estás seguro? No hay vuelta atrás.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => { onResetAllData(); onBack(); }}
+                  className="flex-1 py-2.5 bg-red-700 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Sí, borrar todo
+                </button>
+              </div>
             </div>
           )}
         </div>

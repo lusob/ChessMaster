@@ -316,7 +316,12 @@ export function useProfile() {
     });
   }, []);
 
-  return { profile, isLoaded, createProfile, updateProfile };
+  const resetAllData = useCallback(() => {
+    Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
+    setProfile(null);
+  }, []);
+
+  return { profile, isLoaded, createProfile, updateProfile, resetAllData };
 }
 
 export function getStoredAchievements(): Achievement[] {
