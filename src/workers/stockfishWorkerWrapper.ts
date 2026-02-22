@@ -35,6 +35,24 @@ export class StockfishEngine {
   private isReady = false;
   private callbacks: Map<string, (response: StockfishResponse) => void> = new Map();
   private initPromise: Promise<void> | null = null;
+  // Mutex: solo un comando "go" activo a la vez
+  private goLock: Promise<void> = Promise.resolve();
+  private goLockRelease: (() => void) | null = null;
+
+  private acquireGoLock(): Promise<void> {
+    const prev = this.goLock;
+    let release!: () => void;
+    this.goLock = new Promise<void>((res) => { release = res; });
+    this.goLockRelease = release;
+    return prev;
+  }
+
+  private releaseGoLock() {
+    if (this.goLockRelease) {
+      this.goLockRelease();
+      this.goLockRelease = null;
+    }
+  }
 
   constructor() {
     this.initPromise = this.init();
@@ -374,80 +392,85 @@ export class StockfishEngine {
     });
   }
 
-  getBestMove(difficulty: number): Promise<StockfishResponse> {
-    return new Promise((resolve, reject) => {
-      if (!this.isReady || !this.stockfish) {
-        reject(new Error('Stockfish no está listo'));
-        return;
-      }
+  async getBestMove(difficulty: number): Promise<StockfishResponse> {
+    if (!this.isReady || !this.stockfish) {
+      throw new Error('Stockfish no está listo');
+    }
 
-      const timeout = setTimeout(() => {
-        this.callbacks.delete('go');
-        reject(new Error('Timeout esperando respuesta de Stockfish'));
-      }, 10000);
+    await this.acquireGoLock();
+    try {
+      return await new Promise<StockfishResponse>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          this.callbacks.delete('go');
+          this.releaseGoLock();
+          reject(new Error('Timeout esperando respuesta de Stockfish'));
+        }, 10000);
 
-      this.callbacks.set('go', (response) => {
-        clearTimeout(timeout);
-        if (response.type === 'error') {
-          reject(new Error(response.error || 'Error obteniendo movimiento'));
-        } else {
-          resolve(response);
-        }
+        this.callbacks.set('go', (response) => {
+          clearTimeout(timeout);
+          this.releaseGoLock();
+          if (response.type === 'error') {
+            reject(new Error(response.error || 'Error obteniendo movimiento'));
+          } else {
+            resolve(response);
+          }
+        });
+
+        const params = getStockfishParams(difficulty);
+        this.sendCommand(`setoption name Skill Level value ${params.skillLevel}`);
+        this.sendCommand(`setoption name UCI_LimitStrength value ${params.skillLevel < 20 ? 'true' : 'false'}`);
+        this.sendCommand(`go depth ${params.depth} movetime ${params.movetime}`);
       });
-
-      const params = getStockfishParams(difficulty);
-      this.sendCommand(`setoption name Skill Level value ${params.skillLevel}`);
-      this.sendCommand(`setoption name UCI_LimitStrength value ${params.skillLevel < 20 ? 'true' : 'false'}`);
-      this.sendCommand(`go depth ${params.depth} movetime ${params.movetime}`);
-    });
+    } catch (e) {
+      this.releaseGoLock();
+      throw e;
+    }
   }
 
   /**
    * Analiza la posición actual y retorna el score en centipawns (desde el punto de vista de quien mueve).
    * Usa depth 12 con movetime 800ms para un análisis rápido pero confiable.
    */
-  analyzePosition(fen: string): Promise<number> {
-    return new Promise((resolve) => {
-      if (!this.isReady || !this.stockfish) {
-        resolve(0);
-        return;
-      }
+  async analyzePosition(fen: string): Promise<number> {
+    if (!this.isReady || !this.stockfish) {
+      return 0;
+    }
 
-      let lastScore: number | null = null;
+    await this.acquireGoLock();
+    try {
+      return await new Promise<number>((resolve) => {
+        let lastScore: number | null = null;
 
-      const timeout = setTimeout(() => {
-        this.callbacks.delete('analyze');
-        resolve(lastScore ?? 0);
-      }, 1500);
+        const timeout = setTimeout(() => {
+          this.callbacks.delete('analyze');
+          this.callbacks.delete('go');
+          this.releaseGoLock();
+          resolve(lastScore ?? 0);
+        }, 1500);
 
-      // Override: acumulamos el último score y resolvemos al recibir bestmove
-      const analyzeCallback = (response: StockfishResponse) => {
-        if (response.type === 'info' && response.score !== undefined) {
-          lastScore = response.score;
-          // Re-registrar para seguir recibiendo updates hasta que llegue bestmove
-          this.callbacks.set('analyze', analyzeCallback);
-        }
-      };
+        const analyzeCallback = (response: StockfishResponse) => {
+          if (response.type === 'info' && response.score !== undefined) {
+            lastScore = response.score;
+            this.callbacks.set('analyze', analyzeCallback);
+          }
+        };
 
-      const goCallback = (_response: StockfishResponse) => {
-        clearTimeout(timeout);
-        this.callbacks.delete('analyze');
-        resolve(lastScore ?? 0);
-      };
+        this.callbacks.set('analyze', analyzeCallback);
+        this.callbacks.set('go', (_response) => {
+          clearTimeout(timeout);
+          this.callbacks.delete('analyze');
+          this.releaseGoLock();
+          resolve(lastScore ?? 0);
+        });
 
-      this.callbacks.set('analyze', analyzeCallback);
-      // Sobreescribir callback de go para resolver la promesa
-      const origGoCallback = this.callbacks.get('go');
-      this.callbacks.set('go', (r) => {
-        goCallback(r);
-        // Restaurar callback previo si existía
-        if (origGoCallback) this.callbacks.set('go', origGoCallback);
+        this.sendCommand(`position fen ${fen}`);
+        this.sendCommand('setoption name Skill Level value 20');
+        this.sendCommand('go depth 12 movetime 800');
       });
-
-      this.sendCommand(`position fen ${fen}`);
-      this.sendCommand('setoption name Skill Level value 20');
-      this.sendCommand('go depth 12 movetime 800');
-    });
+    } catch {
+      this.releaseGoLock();
+      return 0;
+    }
   }
 
   stop() {

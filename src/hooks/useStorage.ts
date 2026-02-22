@@ -410,10 +410,13 @@ export function useChampionshipState() {
           const stored = localStorage.getItem(STORAGE_KEYS.CHAMPIONSHIP);
           if (!stored) return prev;
           const parsed = JSON.parse(stored) as ChampionshipState;
+          // No procesar un campeonato ya completado
+          if (parsed.completed) return prev;
           current = recalculateStandings({
             ...parsed,
             startedAt: parsed.startedAt ?? Date.now(),
-            completed: parsed.completed ?? false,
+            completed: false,
+            totalRounds: parsed.totalRounds && parsed.totalRounds > 1 ? parsed.totalRounds : 7,
             players: (parsed.players ?? []).map((p: ChampionshipPlayer) => ({
               ...p,
               opponents: Array.isArray(p.opponents) ? p.opponents : [],
@@ -423,7 +426,7 @@ export function useChampionshipState() {
           return prev;
         }
       }
-      if (!current) return prev;
+      if (!current || current.completed) return prev;
       let next = generatePairingsForCurrentRound(current);
       next = setUserResultForCurrentRound(next, result);
       next = simulateRemainingMatchesForCurrentRound(next);
