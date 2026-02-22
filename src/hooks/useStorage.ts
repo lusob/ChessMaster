@@ -402,8 +402,29 @@ export function useChampionshipState() {
 
   const submitUserResultAndSimulateRound = useCallback((result: 'win' | 'loss' | 'draw') => {
     setChampionship((prev) => {
-      if (!prev) return prev;
-      let next = generatePairingsForCurrentRound(prev);
+      // Si el estado en memoria es null (hook instanciado en un contexto que no lo cargó),
+      // leer directamente de localStorage para no perder el progreso.
+      let current = prev;
+      if (!current) {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEYS.CHAMPIONSHIP);
+          if (!stored) return prev;
+          const parsed = JSON.parse(stored) as ChampionshipState;
+          current = recalculateStandings({
+            ...parsed,
+            startedAt: parsed.startedAt ?? Date.now(),
+            completed: parsed.completed ?? false,
+            players: (parsed.players ?? []).map((p: ChampionshipPlayer) => ({
+              ...p,
+              opponents: Array.isArray(p.opponents) ? p.opponents : [],
+            })),
+          });
+        } catch {
+          return prev;
+        }
+      }
+      if (!current) return prev;
+      let next = generatePairingsForCurrentRound(current);
       next = setUserResultForCurrentRound(next, result);
       next = simulateRemainingMatchesForCurrentRound(next);
       if (isCurrentRoundComplete(next)) {
