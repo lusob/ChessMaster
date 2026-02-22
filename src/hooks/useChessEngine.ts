@@ -194,20 +194,6 @@ function findBestMoveLight(game: Chess, moves: any[]): any {
   return bestMove;
 }
 
-// Clasifica la calidad de un movimiento basándose en la diferencia de score de Stockfish
-// scoreBefore: centipawns desde el punto de vista del jugador que acaba de mover (antes de mover)
-// scoreAfter: centipawns desde el punto de vista del jugador que acaba de mover (después de mover, negado para compensar que cambia turno)
-// La diferencia positiva significa que el movimiento fue mejor que lo esperado
-function classifyMove(scoreBefore: number, scoreAfter: number): MoveAnnotation {
-  const delta = scoreAfter - scoreBefore; // positivo = mejoró la posición
-  if (delta >= 50) return 'brilliant';
-  if (delta >= 10) return 'excellent';
-  if (delta >= -20) return 'good';
-  if (delta >= -100) return 'inaccuracy';
-  if (delta >= -300) return 'mistake';
-  return 'blunder';
-}
-
 // Calcula la ventaja de material desde la perspectiva de las blancas
 function getMaterialAdvantage(game: Chess): number {
   let score = 0;
@@ -372,7 +358,6 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
     }
 
     const game = gameRef.current;
-    const fenBefore = game.fen();
 
     try {
       const result = game.move({
@@ -383,33 +368,6 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
 
       if (result) {
         syncState();
-        setLastMoveAnnotation(null);
-
-        // Análisis asíncrono de calidad del movimiento
-        const engine = stockfishRef.current;
-        const moveIndex = game.history().length - 1; // index of the move just made
-        if (engine?.ready) {
-          const fenAfter = game.fen();
-          (async () => {
-            try {
-              // Score antes (desde perspectiva de quien movió)
-              const scoreBefore = await engine.analyzePosition(fenBefore);
-              // Score después (desde perspectiva del oponente, negamos para comparar)
-              const scoreAfterOpponent = await engine.analyzePosition(fenAfter);
-              const scoreAfter = -scoreAfterOpponent;
-              const annotation = classifyMove(scoreBefore, scoreAfter);
-              setLastMoveAnnotation(annotation);
-              setMoveAnnotations((prev) => {
-                const next = [...prev];
-                next[moveIndex] = annotation;
-                return next;
-              });
-            } catch {
-              // Ignorar errores de análisis
-            }
-          })();
-        }
-
         return true;
       }
       return false;
