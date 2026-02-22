@@ -3,18 +3,8 @@ import { Chessboard } from 'react-chessboard';
 import type { Square } from 'chess.js';
 import { useChessEngine, useBotTimer } from '@/hooks/useChessEngine';
 import type { Bot } from '@/types';
-import type { Move, MoveAnnotation } from '@/hooks/useChessEngine';
+import type { Move } from '@/hooks/useChessEngine';
 import { Loader2, List, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
-
-// Color de la barra de calidad del movimiento (de rojo a verde según anotación)
-const ANNOTATION_BAR: Record<MoveAnnotation, { color: string; width: number; label: string; symbol: string }> = {
-  brilliant:  { color: 'bg-cyan-400',   width: 100, label: 'Brillante',   symbol: '✨' },
-  excellent:  { color: 'bg-green-400',  width: 90,  label: 'Excelente',   symbol: '!!' },
-  good:       { color: 'bg-green-600',  width: 75,  label: 'Buena',       symbol: '!'  },
-  inaccuracy: { color: 'bg-yellow-400', width: 50,  label: 'Imprecisión', symbol: '?!' },
-  mistake:    { color: 'bg-orange-400', width: 30,  label: 'Error',       symbol: '?'  },
-  blunder:    { color: 'bg-red-500',    width: 10,  label: 'Blunder',     symbol: '??' },
-};
 
 interface ChessBoardProps {
   bot: Bot;
@@ -42,7 +32,6 @@ export function ChessBoard({
     isCheck,
     moveCount,
     materialAdvantage,
-    moveAnnotations,
     getLegalMoves,
     makeMove,
     makeBotMove,
@@ -354,7 +343,7 @@ export function ChessBoard({
         </button>
       </div>
 
-      {/* Historial de movimientos con barras de calidad */}
+      {/* Historial de movimientos */}
       {showMoveHistory && (
         <div className="mt-4 bg-gray-800 rounded-lg p-4 max-h-64 overflow-y-auto">
           <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -364,77 +353,16 @@ export function ChessBoard({
           {history.length === 0 ? (
             <p className="text-gray-400 text-sm">Aún no hay movimientos</p>
           ) : (
-            <div className="space-y-1 text-sm">
-              {Array.from({ length: Math.ceil(history.length / 2) }).map((_, movePairIdx) => {
-                const whiteIdx = movePairIdx * 2;
-                const blackIdx = movePairIdx * 2 + 1;
-                const whiteMove = history[whiteIdx];
-                const blackMove = history[blackIdx];
-                const whiteAnn = moveAnnotations[whiteIdx] ?? null;
-                const blackAnn = moveAnnotations[blackIdx] ?? null;
-                return (
-                  <div
-                    key={movePairIdx}
-                    className="flex items-center gap-2 p-1.5 rounded bg-gray-900/50"
-                  >
-                    {/* Número de jugada */}
-                    <span className="text-gray-500 font-medium w-5 shrink-0 text-xs">{movePairIdx + 1}.</span>
-
-                    {/* Movimiento blancas */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <span className="text-white text-xs font-medium">{whiteMove || '-'}</span>
-                        {whiteAnn && (
-                          <span className="text-xs text-gray-400" title={ANNOTATION_BAR[whiteAnn].label}>
-                            {ANNOTATION_BAR[whiteAnn].symbol}
-                          </span>
-                        )}
-                      </div>
-                      <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                        {whiteAnn ? (
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${ANNOTATION_BAR[whiteAnn].color}`}
-                            style={{ width: `${ANNOTATION_BAR[whiteAnn].width}%` }}
-                          />
-                        ) : (
-                          <div className="h-full w-0" />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Separador */}
-                    <div className="w-px h-6 bg-gray-700 shrink-0" />
-
-                    {/* Movimiento negras */}
-                    <div className="flex-1 min-w-0">
-                      {blackMove ? (
-                        <>
-                          <div className="flex items-center justify-between gap-1 mb-0.5">
-                            <span className="text-gray-300 text-xs font-medium">{blackMove}</span>
-                            {blackAnn && (
-                              <span className="text-xs text-gray-400" title={ANNOTATION_BAR[blackAnn].label}>
-                                {ANNOTATION_BAR[blackAnn].symbol}
-                              </span>
-                            )}
-                          </div>
-                          <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                            {blackAnn ? (
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${ANNOTATION_BAR[blackAnn].color}`}
-                                style={{ width: `${ANNOTATION_BAR[blackAnn].width}%` }}
-                              />
-                            ) : (
-                              <div className="h-full w-0" />
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-gray-600 text-xs">—</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm font-mono">
+              {Array.from({ length: Math.ceil(history.length / 2) }).map((_, i) => (
+                <span key={i} className="text-gray-400">
+                  <span className="text-gray-600">{i + 1}.</span>{' '}
+                  <span className="text-white">{history[i * 2]}</span>
+                  {history[i * 2 + 1] && (
+                    <span className="text-gray-300"> {history[i * 2 + 1]}</span>
+                  )}
+                </span>
+              ))}
             </div>
           )}
         </div>

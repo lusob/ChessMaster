@@ -229,6 +229,9 @@ export function usePlayerStats() {
       const eloChange = calculateEloChange(prev.profile.elo, opponentElo, result);
       const newElo = Math.max(100, prev.profile.elo + eloChange);
 
+      const MAX_GAMES = 20;
+      const MAX_GAMES_WITH_HISTORY = 5;
+
       const gameResult = {
         result,
         eloChange,
@@ -239,12 +242,22 @@ export function usePlayerStats() {
         ...(historySan && historySan.length > 0 ? { historySan } : {}),
       };
 
+      // Mantener solo las últimas MAX_GAMES partidas.
+      // De esas, solo las primeras MAX_GAMES_WITH_HISTORY conservan historySan.
+      const allGames = [gameResult, ...prev.games].slice(0, MAX_GAMES).map((g, idx) => {
+        if (idx >= MAX_GAMES_WITH_HISTORY && g.historySan) {
+          const { historySan: _, ...rest } = g;
+          return rest;
+        }
+        return g;
+      });
+
       const updatedStats: PlayerStats = {
         profile: {
           ...prev.profile,
           elo: newElo,
         },
-        games: [gameResult, ...prev.games],
+        games: allGames,
         totalGames: prev.totalGames + 1,
         wins: prev.wins + (result === 'win' ? 1 : 0),
         losses: prev.losses + (result === 'loss' ? 1 : 0),
