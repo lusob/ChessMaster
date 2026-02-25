@@ -415,29 +415,28 @@ export function useChampionshipState() {
 
   const submitUserResultAndSimulateRound = useCallback((result: 'win' | 'loss' | 'draw') => {
     setChampionship((prev) => {
-      // Si el estado en memoria es null (hook instanciado en un contexto que no lo cargó),
-      // leer directamente de localStorage para no perder el progreso.
-      let current = prev;
-      if (!current) {
-        try {
-          const stored = localStorage.getItem(STORAGE_KEYS.CHAMPIONSHIP);
-          if (!stored) return prev;
-          const parsed = JSON.parse(stored) as ChampionshipState;
-          // No procesar un campeonato ya completado
-          if (parsed.completed) return prev;
-          current = recalculateStandings({
-            ...parsed,
-            startedAt: parsed.startedAt ?? Date.now(),
-            completed: false,
-            totalRounds: parsed.totalRounds && parsed.totalRounds > 1 ? parsed.totalRounds : 7,
-            players: (parsed.players ?? []).map((p: ChampionshipPlayer) => ({
-              ...p,
-              opponents: Array.isArray(p.opponents) ? p.opponents : [],
-            })),
-          });
-        } catch {
-          return prev;
-        }
+      // Siempre leer de localStorage para evitar estado obsoleto cuando hay múltiples
+      // instancias del hook (p.ej. App.tsx y Championship.tsx) y una de ellas ha
+      // reiniciado/iniciado el campeonato sin que la otra se haya enterado.
+      let current: ChampionshipState | null = null;
+      try {
+        const stored = localStorage.getItem(STORAGE_KEYS.CHAMPIONSHIP);
+        if (!stored) return prev;
+        const parsed = JSON.parse(stored) as ChampionshipState;
+        // No procesar un campeonato ya completado
+        if (parsed.completed) return prev;
+        current = recalculateStandings({
+          ...parsed,
+          startedAt: parsed.startedAt ?? Date.now(),
+          completed: false,
+          totalRounds: parsed.totalRounds && parsed.totalRounds > 1 ? parsed.totalRounds : 7,
+          players: (parsed.players ?? []).map((p: ChampionshipPlayer) => ({
+            ...p,
+            opponents: Array.isArray(p.opponents) ? p.opponents : [],
+          })),
+        });
+      } catch {
+        return prev;
       }
       if (!current || current.completed) return prev;
       let next = generatePairingsForCurrentRound(current);
