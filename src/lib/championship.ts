@@ -196,16 +196,6 @@ export function recalculateStandings(state: ChampionshipState): ChampionshipStat
   return { ...state, players: Array.from(playersById.values()) };
 }
 
-function sortForPairing(players: ChampionshipPlayer[]) {
-  return players
-    .slice()
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.buchholz !== a.buchholz) return b.buchholz - a.buchholz;
-      return b.elo - a.elo;
-    });
-}
-
 function alreadyPlayed(a: ChampionshipPlayer, b: ChampionshipPlayer) {
   return a.opponents.includes(b.id) || b.opponents.includes(a.id);
 }
@@ -218,44 +208,127 @@ export function generatePairingsForCurrentRound(state: ChampionshipState): Champ
   const playersById = new Map<string, ChampionshipPlayer>(
     state.players.map((p) => [p.id, { ...p, opponents: p.opponents.slice() }] as const),
   );
-  const sorted = sortForPairing(Array.from(playersById.values()));
-  const unpaired = sorted.slice();
-  const newPairings: ChampionshipPairing[] = [];
 
-  const takeNextOpponent = (p: ChampionshipPlayer) => {
-    // Preferir misma puntuación, evitando repetidos si se puede.
-    let bestIdx = -1;
-    let bestScore = -Infinity;
-    for (let i = 0; i < unpaired.length; i++) {
-      const q = unpaired[i];
-      if (q.id === p.id) continue;
-      const repeatPenalty = alreadyPlayed(p, q) ? -1000 : 0;
-      const scoreGroupBonus = -Math.abs((p.points ?? 0) - (q.points ?? 0)) * 100;
-      const eloBonus = -Math.abs(p.elo - q.elo) * 0.01;
-      const score = repeatPenalty + scoreGroupBonus + eloBonus;
-      if (score > bestScore) {
-        bestScore = score;
-        bestIdx = i;
+  // Sistema suizo FIDE (Dutch Swiss):
+  // Ronda 1: ordenar por ELO, emparejar mitad superior con mitad inferior
+  //   (1º vs N/2+1º, 2º vs N/2+2º, ...)
+  // Rondas siguientes: agrupar por puntos (grupos de puntuación), dentro de
+  //   cada grupo ordenar por ELO y emparejar mitad superior con mitad inferior.
+  //   Si el grupo tiene número impar, el jugador sobrante baja al grupo siguiente.
+
+  const allPlayers = Array.from(playersById.values());
+  const rawPairs: Array<{ p: ChampionshipPlayer; q: ChampionshipPlayer }> = [];
+  const pairedIds = new Set<string>();
+
+  const pairWithinGroup = (group: ChampionshipPlayer[]) => {
+    // Ordenar dentro del grupo por ELO desc (mismo criterio FIDE)
+    group.sort((a, b) => b.elo - a.elo);
+    const mid = Math.floor(group.length / 2);
+    const top = group.slice(0, mid);
+    const bottom = group.slice(mid);
+
+    // Intentar emparejar top[i] con bottom[i] evitando repetidos
+    const usedBottom = new Set<number>();
+    for (let i = 0; i < top.length; i++) {
+      const p = top[i];
+      if (pairedIds.has(p.id)) continue;
+      let bestJ = -1;
+      // Buscar en bottom empezando por el emparejamiento natural (misma posición)
+      for (let offset = 0; offset < bottom.length; offset++) {
+        const j = (i + offset) % bottom.length;
+        const q = bottom[j];
+        if (pairedIds.has(q.id) || usedBottom.has(j)) continue;
+        if (alreadyPlayed(p, q) && bottom.length > 1 && offset < bottom.length - 1) continue;
+        bestJ = j;
+        break;
+      }
+      if (bestJ === -1) {
+        // Fallback: cualquier sin usar, aunque se repita
+        for (let j = 0; j < bottom.length; j++) {
+          if (!pairedIds.has(bottom[j].id) && !usedBottom.has(j)) {
+            bestJ = j;
+            break;
+          }
+        }
+      }
+      if (bestJ >= 0) {
+        const q = bottom[bestJ];
+        rawPairs.push({ p, q });
+        pairedIds.add(p.id);
+        pairedIds.add(q.id);
+        usedBottom.add(bestJ);
+
+        const pRef = playersById.get(p.id);
+        const qRef = playersById.get(q.id);
+        if (pRef && !pRef.opponents.includes(q.id)) pRef.opponents.push(q.id);
+        if (qRef && !qRef.opponents.includes(p.id)) qRef.opponents.push(p.id);
       }
     }
-    return bestIdx;
   };
+
+  if (round === 1) {
+    // Ronda 1: todos ordenados por ELO, mitad superior vs mitad inferior
+    const byElo = allPlayers.slice().sort((a, b) => b.elo - a.elo);
+    pairWithinGroup(byElo);
+  } else {
+    // Rondas siguientes: agrupar por puntos (desc), procesar grupo a grupo
+    const pointValues = [...new Set(allPlayers.map((p) => p.points))].sort((a, b) => b - a);
+    let floaters: ChampionshipPlayer[] = [];
+
+    for (const pts of pointValues) {
+      const group = [
+        ...floaters,
+        ...allPlayers.filter((p) => p.points === pts && !pairedIds.has(p.id)),
+      ];
+      floaters = [];
+
+      if (group.length === 0) continue;
+
+      if (group.length % 2 !== 0) {
+        // El último (ELO más bajo del grupo) flota al siguiente grupo
+        group.sort((a, b) => b.elo - a.elo);
+        floaters.push(group.pop()!);
+      }
+
+      pairWithinGroup(group);
+    }
+
+    // Si quedan flotadores sin emparejar (raro), emparejarlos entre sí
+    if (floaters.length >= 2) {
+      pairWithinGroup(floaters);
+    }
+  }
+
+  // Emparejar cualquier jugador sin pareja (no debería ocurrir en número par)
+  const unpaired = allPlayers.filter((p) => !pairedIds.has(p.id));
+  for (let i = 0; i + 1 < unpaired.length; i += 2) {
+    rawPairs.push({ p: unpaired[i], q: unpaired[i + 1] });
+    const pRef = playersById.get(unpaired[i].id);
+    const qRef = playersById.get(unpaired[i + 1].id);
+    if (pRef && !pRef.opponents.includes(unpaired[i + 1].id)) pRef.opponents.push(unpaired[i + 1].id);
+    if (qRef && !qRef.opponents.includes(unpaired[i].id)) qRef.opponents.push(unpaired[i].id);
+  }
 
   // Determinar color del usuario para esta ronda (alternando respecto a la anterior)
   const userColorThisRound: 'w' | 'b' = state.lastUserColor === 'w' ? 'b' : 'w';
+  const newPairings: ChampionshipPairing[] = [];
 
-  let table = 1;
-  while (unpaired.length > 0) {
-    const p = unpaired.shift()!;
-    const oppIdx = takeNextOpponent(p);
-    const q = oppIdx >= 0 ? unpaired.splice(oppIdx, 1)[0] : unpaired.shift()!;
+  // Mesa 1 = la partida más destacada (mayor puntuación media de los dos jugadores)
+  // Mismo orden que info64.org: grupo de 1 pto en mesas 1-N, luego 0.5 pto, luego 0 pto
+  rawPairs.sort((a, b) => {
+    const aAvg = (a.p.points + a.q.points) / 2;
+    const bAvg = (b.p.points + b.q.points) / 2;
+    if (bAvg !== aAvg) return bAvg - aAvg;
+    return Math.max(b.p.elo, b.q.elo) - Math.max(a.p.elo, a.q.elo);
+  });
 
-    // Alternar color del usuario entre rondas
+  rawPairs.forEach(({ p, q }, idx) => {
+    const table = idx + 1;
+
     let whiteId = p.id;
     let blackId = q.id;
     if (p.id === state.userId || q.id === state.userId) {
-      const userIsP = p.id === state.userId;
-      const opp = userIsP ? q : p;
+      const opp = p.id === state.userId ? q : p;
       if (userColorThisRound === 'w') {
         whiteId = state.userId;
         blackId = opp.id;
@@ -263,29 +336,13 @@ export function generatePairingsForCurrentRound(state: ChampionshipState): Champ
         whiteId = opp.id;
         blackId = state.userId;
       }
-    } else {
-      // Alternar colores por mesa (simple)
-      if (table % 2 === 0) {
-        whiteId = q.id;
-        blackId = p.id;
-      }
+    } else if (table % 2 === 0) {
+      whiteId = q.id;
+      blackId = p.id;
     }
 
-    newPairings.push({
-      round,
-      table,
-      whiteId,
-      blackId,
-    });
-
-    // Registrar rivales para evitar repetidos
-    const pRef = playersById.get(p.id);
-    const qRef = playersById.get(q.id);
-    if (pRef && !pRef.opponents.includes(q.id)) pRef.opponents.push(q.id);
-    if (qRef && !qRef.opponents.includes(p.id)) qRef.opponents.push(p.id);
-
-    table++;
-  }
+    newPairings.push({ round, table, whiteId, blackId });
+  });
 
   return recalculateStandings({
     ...state,

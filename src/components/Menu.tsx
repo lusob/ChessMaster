@@ -148,8 +148,11 @@ export function Menu({ onSelectMode, playerName, playerElo, playerAvatar }: Menu
       </div>
 
       {/* Footer */}
-      <div className="mt-auto pb-6 text-center text-xs text-gray-600 px-4">
+      <div className="mt-auto pb-6 text-center text-xs text-gray-600 px-4 space-y-0.5">
         <p>Hecho con ❤️ para los alumnos del club de ajedrez Siero</p>
+        <p>
+          v{__APP_VERSION__} · {new Date(__BUILD_DATE__).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
+        </p>
       </div>
     </div>
   );
