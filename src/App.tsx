@@ -17,7 +17,6 @@ function App() {
   const [mode, setMode] = useState<GameMode>('menu');
   const [currentBot, setCurrentBot] = useState<Bot | null>(null);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
-  const [adaptiveMode, setAdaptiveMode] = useState(false);
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
   const [returnMode, setReturnMode] = useState<GameMode>('menu');
@@ -45,10 +44,9 @@ function App() {
     setCurrentBot(null);
   }, []);
 
-  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w', adaptive = false) => {
+  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w') => {
     setCurrentBot(bot);
     setPlayerColor(color);
-    setAdaptiveMode(adaptive);
     setReturnMode(backTo);
     setMode('game');
   }, []);
@@ -58,14 +56,12 @@ function App() {
     moves: number;
     reason: string;
     historySan: string[];
-    effectiveOpponentElo: number;
     lastMoveVerbose?: any;
   }) => {
     if (currentBot) {
       const playerEloBefore = stats?.profile?.elo ?? 1000;
-      const opponentElo = payload.effectiveOpponentElo;
 
-      addGameResult(payload.result, opponentElo, currentBot.name, payload.moves, (newElo) => {
+      addGameResult(payload.result, currentBot.elo, currentBot.name, payload.moves, (newElo) => {
         updateProfile({ elo: newElo });
       }, payload.historySan);
 
@@ -92,7 +88,7 @@ function App() {
         result: payload.result,
         reason: payload.reason,
         moves: payload.moves,
-        opponentElo,
+        opponentElo: currentBot.elo,
         opponentName: currentBot.name,
         playerEloBefore,
         lastMoveVerbose: payload.lastMoveVerbose,
@@ -168,7 +164,6 @@ function App() {
               <ChessBoard
                 bot={currentBot}
                 playerColor={playerColor}
-                playerElo={adaptiveMode ? (profile?.elo ?? 1000) : currentBot.elo}
                 onGameEnd={handleGameEnd}
               />
             </div>
@@ -177,8 +172,7 @@ function App() {
         return (
           <BotSelector
             bots={bots}
-            playerElo={profile?.elo ?? 1000}
-            onSelectBot={(bot, adaptive) => startGame(bot, 'menu', 'w', adaptive)}
+            onSelectBot={(bot) => startGame(bot, 'menu')}
             onBack={() => handleBack('menu')}
           />
         );
