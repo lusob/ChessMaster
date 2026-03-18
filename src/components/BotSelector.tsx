@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import type { Bot } from '@/types';
-import { ChevronLeft, Play, Star, Filter } from 'lucide-react';
+import { ChevronLeft, Play, Star, Filter, Zap } from 'lucide-react';
 
 interface BotSelectorProps {
   bots: Bot[];
-  onSelectBot: (bot: Bot) => void;
+  playerElo?: number;
+  onSelectBot: (bot: Bot, adaptive: boolean) => void;
   onBack: () => void;
 }
 
-export function BotSelector({ bots, onSelectBot, onBack }: BotSelectorProps) {
+export function BotSelector({ bots, playerElo = 1000, onSelectBot, onBack }: BotSelectorProps) {
   const [difficultyFilter, setDifficultyFilter] = useState<number | null>(null);
   const [selectedBot, setSelectedBot] = useState<Bot | null>(null);
+  const [adaptive, setAdaptive] = useState(false);
 
   // Filtrar bots
   const filteredBots = bots.filter((bot) => {
@@ -27,8 +29,17 @@ export function BotSelector({ bots, onSelectBot, onBack }: BotSelectorProps) {
 
   const handleStartGame = () => {
     if (selectedBot) {
-      onSelectBot(selectedBot);
+      onSelectBot(selectedBot, adaptive);
     }
+  };
+
+  // ELO efectivo del bot seleccionado en modo adaptativo
+  const effectiveEloPreview = (bot: Bot) => {
+    if (!adaptive) return bot.elo;
+    const diff = playerElo - bot.elo;
+    const adjustment = Math.round(Math.max(-2, Math.min(2, diff / 200)));
+    const effDiff = Math.max(1, Math.min(10, bot.difficulty + adjustment));
+    return Math.round(100 + (effDiff - 1) * (1400 / 9));
   };
 
   const getDifficultyLabel = (diff: number) => {
@@ -52,6 +63,33 @@ export function BotSelector({ bots, onSelectBot, onBack }: BotSelectorProps) {
           <p className="text-sm text-gray-400">Selecciona tu oponente</p>
         </div>
       </div>
+
+      {/* Toggle adaptativo */}
+      <button
+        onClick={() => setAdaptive((v) => !v)}
+        className={`w-full flex items-center justify-between p-3 rounded-xl mb-4 transition-colors border ${
+          adaptive
+            ? 'bg-purple-600/20 border-purple-500/50 text-purple-300'
+            : 'bg-gray-800 border-gray-700 text-gray-400'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <Zap className={`w-4 h-4 ${adaptive ? 'text-purple-400' : 'text-gray-500'}`} />
+          <div className="text-left">
+            <p className={`text-sm font-semibold ${adaptive ? 'text-purple-200' : 'text-gray-300'}`}>
+              Modo adaptativo
+            </p>
+            <p className="text-xs text-gray-500">
+              {adaptive
+                ? `El bot ajusta su fuerza a tu ELO (${playerElo})`
+                : 'El bot juega con su dificultad fija'}
+            </p>
+          </div>
+        </div>
+        <div className={`w-10 h-5 rounded-full transition-colors relative ${adaptive ? 'bg-purple-500' : 'bg-gray-600'}`}>
+          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${adaptive ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        </div>
+      </button>
 
       {/* Filtros */}
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
@@ -149,7 +187,10 @@ export function BotSelector({ bots, onSelectBot, onBack }: BotSelectorProps) {
                       {diffInfo.label}
                     </span>
                     <span className="text-xs text-gray-500">
-                      ELO {bot.elo}
+                      ELO {effectiveEloPreview(bot)}
+                      {adaptive && effectiveEloPreview(bot) !== bot.elo && (
+                        <span className="text-gray-600"> (base {bot.elo})</span>
+                      )}
                     </span>
                   </div>
                 </div>

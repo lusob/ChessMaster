@@ -17,6 +17,7 @@ function App() {
   const [mode, setMode] = useState<GameMode>('menu');
   const [currentBot, setCurrentBot] = useState<Bot | null>(null);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
+  const [adaptiveMode, setAdaptiveMode] = useState(false);
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
   const [returnMode, setReturnMode] = useState<GameMode>('menu');
@@ -44,9 +45,10 @@ function App() {
     setCurrentBot(null);
   }, []);
 
-  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w') => {
+  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w', adaptive = false) => {
     setCurrentBot(bot);
     setPlayerColor(color);
+    setAdaptiveMode(adaptive);
     setReturnMode(backTo);
     setMode('game');
   }, []);
@@ -166,17 +168,18 @@ function App() {
               <ChessBoard
                 bot={currentBot}
                 playerColor={playerColor}
-                playerElo={profile?.elo ?? 1000}
+                playerElo={adaptiveMode ? (profile?.elo ?? 1000) : currentBot.elo}
                 onGameEnd={handleGameEnd}
               />
             </div>
           );
         }
         return (
-          <BotSelector 
-            bots={bots} 
-            onSelectBot={(bot) => startGame(bot, 'menu')} 
-            onBack={() => handleBack('menu')} 
+          <BotSelector
+            bots={bots}
+            playerElo={profile?.elo ?? 1000}
+            onSelectBot={(bot, adaptive) => startGame(bot, 'menu', 'w', adaptive)}
+            onBack={() => handleBack('menu')}
           />
         );
 
