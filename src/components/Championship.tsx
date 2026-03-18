@@ -6,7 +6,7 @@ import {
   championshipPlayerToBot,
   isCurrentRoundComplete,
 } from '@/lib/championship';
-import { ChevronLeft, Trophy, Play, Award, TrendingUp, List, BarChart2 } from 'lucide-react';
+import { ChevronLeft, Trophy, Play, Award, TrendingUp, List, BarChart2, Zap } from 'lucide-react';
 
 interface ChampionshipProps {
   userProfile: { id: string; name: string; elo: number; createdAt: number };
@@ -137,6 +137,7 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('partida');
   const [historyRound, setHistoryRound] = useState(1);
+  const [adaptive, setAdaptive] = useState(false);
 
   // Asegurar que los emparejamientos de la ronda actual existan
   useEffect(() => {
@@ -285,8 +286,35 @@ export function Championship({ userProfile, onSelectBot, onBack }: ChampionshipP
           </div>
         </div>
 
+        {/* Toggle adaptativo */}
         <button
-          onClick={() => startNew(userProfile)}
+          onClick={() => setAdaptive((v) => !v)}
+          className={`w-full flex items-center justify-between p-3 rounded-xl mb-3 transition-colors border ${
+            adaptive
+              ? 'bg-purple-600/20 border-purple-500/50'
+              : 'bg-gray-700/50 border-gray-600'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Zap className={`w-4 h-4 ${adaptive ? 'text-purple-400' : 'text-gray-500'}`} />
+            <div className="text-left">
+              <p className={`text-sm font-semibold ${adaptive ? 'text-purple-200' : 'text-gray-300'}`}>
+                Modo adaptativo
+              </p>
+              <p className="text-xs text-gray-500">
+                {adaptive
+                  ? `ELOs centrados en tu nivel (${userProfile.elo})`
+                  : 'Rivales con ELO fijo (100–1500)'}
+              </p>
+            </div>
+          </div>
+          <div className={`w-10 h-5 rounded-full transition-colors relative shrink-0 ${adaptive ? 'bg-purple-500' : 'bg-gray-600'}`}>
+            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${adaptive ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </div>
+        </button>
+
+        <button
+          onClick={() => startNew(userProfile, adaptive)}
           className="w-full py-4 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
         >
           <Trophy className="w-5 h-5" />

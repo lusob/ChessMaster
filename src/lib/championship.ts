@@ -92,11 +92,13 @@ export function createInitialChampionshipState(params: {
   userProfile: PlayerProfile;
   totalRounds?: number;
   totalPlayers?: number;
+  adaptive?: boolean;
 }): ChampionshipState {
   const {
     userProfile,
     totalRounds = 7,
     totalPlayers = 40,
+    adaptive = false,
   } = params;
 
   const userId = userProfile.id;
@@ -117,7 +119,24 @@ export function createInitialChampionshipState(params: {
   const botCount = totalPlayers - 1;
   const groupedBots = createGroupedBots(botCount);
 
-  groupedBots.forEach((bot, i) => {
+  // En modo adaptativo, escalar los ELOs de los bots para que estén centrados
+  // alrededor del ELO del jugador, manteniendo la distribución relativa.
+  // Los bots originales van de 100 a 1500 (rango 1400). En modo adaptativo
+  // los centramos en playerElo con un rango de ±500 (total 1000).
+  const scaledBots = adaptive ? (() => {
+    const playerElo = userProfile.elo;
+    const origMin = 100, origMax = 1500, origRange = origMax - origMin;
+    const targetRange = 1000;
+    const targetMin = Math.max(100, playerElo - 500);
+    const targetMax = targetMin + targetRange;
+    return groupedBots.map((bot) => {
+      const t = (bot.elo - origMin) / origRange; // 0..1
+      const scaledElo = Math.round(clamp(targetMin + t * targetRange, 100, targetMax));
+      return { ...bot, elo: scaledElo };
+    });
+  })() : groupedBots;
+
+  scaledBots.forEach((bot, i) => {
     players.push({
       id: `champ-bot-${i + 1}`,
       name: bot.name,
@@ -139,6 +158,7 @@ export function createInitialChampionshipState(params: {
     userId,
     startedAt: Date.now(),
     completed: false,
+    adaptive,
   };
 }
 

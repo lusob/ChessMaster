@@ -92,6 +92,8 @@ export interface ChampionshipState {
   completed: boolean;
   // Color del usuario en la última ronda jugada ('w' | 'b'), para alternar
   lastUserColor?: 'w' | 'b';
+  // Si el campeonato fue creado en modo adaptativo (ELOs escalados al jugador)
+  adaptive?: boolean;
 }
 
 export interface CustomBotFormData {

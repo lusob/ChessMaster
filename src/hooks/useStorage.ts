@@ -391,8 +391,8 @@ export function useChampionshipState() {
     localStorage.setItem(STORAGE_KEYS.CHAMPIONSHIP, JSON.stringify(state));
   }, []);
 
-  const startNew = useCallback((userProfile: PlayerProfile) => {
-    const initial = createInitialChampionshipState({ userProfile });
+  const startNew = useCallback((userProfile: PlayerProfile, adaptive = false) => {
+    const initial = createInitialChampionshipState({ userProfile, adaptive });
     const withPairings = generatePairingsForCurrentRound(initial);
     persist(withPairings);
     setChampionship(withPairings);
