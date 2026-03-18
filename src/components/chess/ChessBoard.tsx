@@ -9,6 +9,7 @@ import { Loader2, List, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
 interface ChessBoardProps {
   bot: Bot;
   playerColor?: 'w' | 'b';
+  playerElo?: number;
   onGameEnd?: (payload: {
     result: 'win' | 'loss' | 'draw';
     moves: number;
@@ -19,9 +20,19 @@ interface ChessBoardProps {
   onMove?: () => void;
 }
 
+// Calcula la dificultad efectiva (1-10) basándose en la diferencia de ELO.
+// El bot mantiene su dificultad base pero se ajusta ±2 niveles según el ELO relativo del jugador.
+function effectiveDifficulty(baseDifficulty: number, playerElo: number, botElo: number): number {
+  const diff = playerElo - botElo; // positivo = jugador más fuerte
+  // Cada 200 ELO de diferencia ajusta ±1 nivel (máx ±2)
+  const adjustment = Math.round(Math.max(-2, Math.min(2, diff / 200)));
+  return Math.max(1, Math.min(10, baseDifficulty + adjustment));
+}
+
 export function ChessBoard({
   bot,
   playerColor = 'w',
+  playerElo = 1000,
   onGameEnd,
   onMove,
 }: ChessBoardProps) {
@@ -52,27 +63,34 @@ export function ChessBoard({
   const [moveFrom, setMoveFrom] = useState<Square | null>(null);
   const [gameEnded, setGameEnded] = useState(false);
   const [showMoveHistory, setShowMoveHistory] = useState(false);
+  const [stockfishError, setStockfishError] = useState(false);
   const botFirstMoveFired = useRef(false);
+
+  const difficulty = effectiveDifficulty(bot.difficulty, playerElo, bot.elo);
 
   // Si el jugador juega con negras, el bot (blancas) debe mover primero
   useEffect(() => {
     if (playerColor === 'b' && !gameEnded && !botFirstMoveFired.current) {
       botFirstMoveFired.current = true;
       scheduleBotMove(async () => {
-        await makeBotMove(bot.difficulty);
-        if (isGameOver()) {
-          const { result, reason } = getGameResult();
-          if (result) {
-            setGameEnded(true);
-            const verbose = getHistoryVerbose();
-            onGameEnd?.({
-              result,
-              moves: 1,
-              reason,
-              historySan: [],
-              lastMoveVerbose: verbose[verbose.length - 1],
-            });
+        try {
+          await makeBotMove(difficulty);
+          if (isGameOver()) {
+            const { result, reason } = getGameResult();
+            if (result) {
+              setGameEnded(true);
+              const verbose = getHistoryVerbose();
+              onGameEnd?.({
+                result,
+                moves: 1,
+                reason,
+                historySan: [],
+                lastMoveVerbose: verbose[verbose.length - 1],
+              });
+            }
           }
+        } catch {
+          setStockfishError(true);
         }
       }, 600);
     }
@@ -140,14 +158,18 @@ export function ChessBoard({
       }
 
       scheduleBotMove(async () => {
-        await makeBotMove(bot.difficulty);
-        if (isGameOver()) {
-          const { result, reason } = getGameResult();
-          if (result) {
-            setGameEnded(true);
-            const verbose = getHistoryVerbose();
-            onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+        try {
+          await makeBotMove(difficulty);
+          if (isGameOver()) {
+            const { result, reason } = getGameResult();
+            if (result) {
+              setGameEnded(true);
+              const verbose = getHistoryVerbose();
+              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+            }
           }
+        } catch {
+          setStockfishError(true);
         }
       }, 600 + Math.random() * 400);
     } else {
@@ -156,7 +178,7 @@ export function ChessBoard({
   }, [
     moveFrom, history, isPlayerTurn, gameEnded, makeMove, onMove,
     isGameOver, getGameResult, onGameEnd, moveCount,
-    scheduleBotMove, makeBotMove, bot.difficulty,
+    scheduleBotMove, makeBotMove, difficulty,
     getHistoryVerbose, onPieceClick, isAtLatestPosition,
   ]);
 
@@ -189,14 +211,18 @@ export function ChessBoard({
       }
 
       scheduleBotMove(async () => {
-        await makeBotMove(bot.difficulty);
-        if (isGameOver()) {
-          const { result, reason } = getGameResult();
-          if (result) {
-            setGameEnded(true);
-            const verbose = getHistoryVerbose();
-            onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+        try {
+          await makeBotMove(difficulty);
+          if (isGameOver()) {
+            const { result, reason } = getGameResult();
+            if (result) {
+              setGameEnded(true);
+              const verbose = getHistoryVerbose();
+              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+            }
           }
+        } catch {
+          setStockfishError(true);
         }
       }, 600 + Math.random() * 400);
 
@@ -206,7 +232,7 @@ export function ChessBoard({
   }, [
     isPlayerTurn, gameEnded, makeMove, onMove,
     isGameOver, getGameResult, onGameEnd, moveCount,
-    scheduleBotMove, makeBotMove, bot.difficulty,
+    scheduleBotMove, makeBotMove, difficulty,
     history, getHistoryVerbose, isAtLatestPosition,
   ]);
 
@@ -243,6 +269,25 @@ export function ChessBoard({
     showNotation: true,
     animationDurationInMs: 200,
   };
+
+  if (stockfishError) {
+    return (
+      <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center py-16 px-4 text-center">
+        <div className="text-5xl mb-4">⚠️</div>
+        <h2 className="text-xl font-bold text-white mb-2">Error del motor de ajedrez</h2>
+        <p className="text-gray-400 text-sm mb-6">
+          Stockfish no ha podido inicializarse correctamente.<br />
+          Por favor, reinicia la aplicación para continuar.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-colors"
+        >
+          Reiniciar aplicación
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto">

@@ -164,6 +164,7 @@ function App() {
               <ChessBoard
                 bot={currentBot}
                 playerColor={playerColor}
+                playerElo={profile?.elo ?? 1000}
                 onGameEnd={handleGameEnd}
               />
             </div>
