@@ -15,18 +15,24 @@ interface ChessBoardProps {
     moves: number;
     reason: string;
     historySan: string[];
+    effectiveOpponentElo: number;
     lastMoveVerbose?: any;
   }) => void;
   onMove?: () => void;
 }
 
-// Calcula la dificultad efectiva (1-10) basándose en la diferencia de ELO.
-// El bot mantiene su dificultad base pero se ajusta ±2 niveles según el ELO relativo del jugador.
-function effectiveDifficulty(baseDifficulty: number, playerElo: number, botElo: number): number {
-  const diff = playerElo - botElo; // positivo = jugador más fuerte
-  // Cada 200 ELO de diferencia ajusta ±1 nivel (máx ±2)
+// Calcula la dificultad efectiva (1-10) y ELO efectivo del bot según diferencia de ELO del jugador.
+// Ajuste: ±1 nivel de dificultad por cada 200 ELO de diferencia, máx ±2 niveles.
+// ELO efectivo: interpolación lineal entre 100 (diff=1) y 1500 (diff=10).
+function effectiveDifficultyAndElo(
+  baseDifficulty: number, playerElo: number, botElo: number
+): { difficulty: number; elo: number } {
+  const diff = playerElo - botElo;
   const adjustment = Math.round(Math.max(-2, Math.min(2, diff / 200)));
-  return Math.max(1, Math.min(10, baseDifficulty + adjustment));
+  const difficulty = Math.max(1, Math.min(10, baseDifficulty + adjustment));
+  // ELO efectivo proporcional a la dificultad efectiva (1→100, 10→1500)
+  const elo = Math.round(100 + (difficulty - 1) * (1400 / 9));
+  return { difficulty, elo };
 }
 
 export function ChessBoard({
@@ -66,7 +72,7 @@ export function ChessBoard({
   const [stockfishError, setStockfishError] = useState(false);
   const botFirstMoveFired = useRef(false);
 
-  const difficulty = effectiveDifficulty(bot.difficulty, playerElo, bot.elo);
+  const { difficulty, elo: effectiveElo } = effectiveDifficultyAndElo(bot.difficulty, playerElo, bot.elo);
 
   // Si el jugador juega con negras, el bot (blancas) debe mover primero
   useEffect(() => {
@@ -85,6 +91,7 @@ export function ChessBoard({
                 moves: 1,
                 reason,
                 historySan: [],
+                effectiveOpponentElo: effectiveElo,
                 lastMoveVerbose: verbose[verbose.length - 1],
               });
             }
@@ -152,7 +159,7 @@ export function ChessBoard({
         if (result) {
           setGameEnded(true);
           const verbose = getHistoryVerbose();
-          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, effectiveOpponentElo: effectiveElo, lastMoveVerbose: verbose[verbose.length - 1] });
         }
         return;
       }
@@ -165,7 +172,7 @@ export function ChessBoard({
             if (result) {
               setGameEnded(true);
               const verbose = getHistoryVerbose();
-              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, effectiveOpponentElo: effectiveElo, lastMoveVerbose: verbose[verbose.length - 1] });
             }
           }
         } catch {
@@ -205,7 +212,7 @@ export function ChessBoard({
         if (result) {
           setGameEnded(true);
           const verbose = getHistoryVerbose();
-          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, effectiveOpponentElo: effectiveElo, lastMoveVerbose: verbose[verbose.length - 1] });
         }
         return true;
       }
@@ -218,7 +225,7 @@ export function ChessBoard({
             if (result) {
               setGameEnded(true);
               const verbose = getHistoryVerbose();
-              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, effectiveOpponentElo: effectiveElo, lastMoveVerbose: verbose[verbose.length - 1] });
             }
           }
         } catch {
@@ -302,7 +309,9 @@ export function ChessBoard({
           </div>
           <div>
             <p className="font-semibold text-white">{bot.name}</p>
-            <p className="text-xs text-gray-400">ELO: {bot.elo} • Dif: {bot.difficulty}/10</p>
+            <p className="text-xs text-gray-400">
+              ELO: {effectiveElo}{effectiveElo !== bot.elo ? ` (base ${bot.elo})` : ''} • Dif: {difficulty}/10
+            </p>
           </div>
         </div>
         {isThinking && (

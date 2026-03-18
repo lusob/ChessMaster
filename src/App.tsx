@@ -56,25 +56,27 @@ function App() {
     moves: number;
     reason: string;
     historySan: string[];
+    effectiveOpponentElo: number;
     lastMoveVerbose?: any;
   }) => {
     if (currentBot) {
       const playerEloBefore = stats?.profile?.elo ?? 1000;
+      const opponentElo = payload.effectiveOpponentElo;
 
-      addGameResult(payload.result, currentBot.elo, currentBot.name, payload.moves, (newElo) => {
+      addGameResult(payload.result, opponentElo, currentBot.name, payload.moves, (newElo) => {
         updateProfile({ elo: newElo });
       }, payload.historySan);
 
       if (payload.result === 'win') {
         fireWinConfetti();
       }
-      
+
       // Si estamos en modo torneo y ganamos, avanzar
       let tournamentCompleted = false;
       if (payload.result === 'win' && mode === 'game' && currentBot.inTournament) {
         const tournamentBots = getTournamentBots().sort((a, b) => a.difficulty - b.difficulty);
         const botIndex = tournamentBots.findIndex(b => b.id === currentBot.id);
-        
+
         if (botIndex >= 0 && !tournamentProgress.includes(currentBot.id)) {
           setTournamentProgress(prev => [...prev, currentBot.id]);
           if (botIndex + 1 > currentTournamentIndex) {
@@ -88,7 +90,7 @@ function App() {
         result: payload.result,
         reason: payload.reason,
         moves: payload.moves,
-        opponentElo: currentBot.elo,
+        opponentElo,
         opponentName: currentBot.name,
         playerEloBefore,
         lastMoveVerbose: payload.lastMoveVerbose,
