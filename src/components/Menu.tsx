@@ -47,8 +47,8 @@ export function Menu({ onSelectMode, playerName, playerElo, playerAvatar }: Menu
     },
     {
       mode: 'custom-championship' as GameMode,
-      title: 'Torneo Personalizado',
-      description: 'Importa rivales de info64 o crea el tuyo',
+      title: 'Campeonato Real',
+      description: 'Simula tu torneo importando desde info64.org',
       icon: <Pencil className="w-7 h-7" />,
       gradient: 'from-teal-500 to-emerald-500',
       glow: 'shadow-teal-500/30',
