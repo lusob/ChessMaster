@@ -369,6 +369,7 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
     makeBotMove,
     isGameOver,
     getGameResult,
+    getHistory: () => gameRef.current.history() as string[],
     getHistoryVerbose: () => gameRef.current.history({ verbose: true }) as any[],
     undo,
     goBack,

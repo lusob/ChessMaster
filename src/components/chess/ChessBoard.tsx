@@ -37,6 +37,7 @@ export function ChessBoard({
     makeBotMove,
     isGameOver,
     getGameResult,
+    getHistory,
     getHistoryVerbose,
     resetGame,
     goBack,
@@ -140,7 +141,7 @@ export function ChessBoard({
         if (result) {
           setGameEnded(true);
           const verbose = getHistoryVerbose();
-          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
         }
         return;
       }
@@ -153,7 +154,7 @@ export function ChessBoard({
             if (result) {
               setGameEnded(true);
               const verbose = getHistoryVerbose();
-              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
             }
           }
         } catch {
@@ -164,10 +165,10 @@ export function ChessBoard({
       onPieceClick({ isSparePiece: false, piece: args.piece, square });
     }
   }, [
-    moveFrom, history, isPlayerTurn, gameEnded, makeMove, onMove,
+    moveFrom, isPlayerTurn, gameEnded, makeMove, onMove,
     isGameOver, getGameResult, onGameEnd, moveCount,
     scheduleBotMove, makeBotMove,
-    getHistoryVerbose, onPieceClick, isAtLatestPosition,
+    getHistory, getHistoryVerbose, onPieceClick, isAtLatestPosition,
   ]);
 
   // Movimiento por drag & drop (desktop)
@@ -193,7 +194,7 @@ export function ChessBoard({
         if (result) {
           setGameEnded(true);
           const verbose = getHistoryVerbose();
-          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+          onGameEnd?.({ result, moves: moveCount + 1, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
         }
         return true;
       }
@@ -206,7 +207,7 @@ export function ChessBoard({
             if (result) {
               setGameEnded(true);
               const verbose = getHistoryVerbose();
-              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: history, lastMoveVerbose: verbose[verbose.length - 1] });
+              onGameEnd?.({ result, moves: moveCount + 2, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
             }
           }
         } catch {
@@ -221,7 +222,7 @@ export function ChessBoard({
     isPlayerTurn, gameEnded, makeMove, onMove,
     isGameOver, getGameResult, onGameEnd, moveCount,
     scheduleBotMove, makeBotMove,
-    history, getHistoryVerbose, isAtLatestPosition,
+    getHistory, getHistoryVerbose, isAtLatestPosition,
   ]);
 
   const canDragPiece = (args: { isSparePiece: boolean; piece: any; square: string | null }) => {
