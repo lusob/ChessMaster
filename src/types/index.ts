@@ -108,9 +108,30 @@ export type GameMode =
   | 'game'
   | 'tournament'
   | 'championship'
+  | 'custom-championship'
   | 'custom-bots'
   | 'stats'
   | 'profile';
+
+// Jugador importado/creado manualmente para torneo personalizado
+export interface CustomChampionshipPlayer {
+  id: string;
+  name: string;
+  emoji: string;
+  elo: number;
+  club?: string;
+  photoUrl?: string;
+}
+
+// Configuración de un torneo personalizado
+export interface CustomChampionshipConfig {
+  title: string;
+  system: 'swiss'; // Extensible en el futuro
+  totalRounds: number;
+  eloMin: number;
+  eloMax: number;
+  players: CustomChampionshipPlayer[];
+}
 
 export interface GameState {
   fen: string;

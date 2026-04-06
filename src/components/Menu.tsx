@@ -1,5 +1,5 @@
 import type { GameMode } from '@/types';
-import { Trophy, Settings, BarChart3, User, ChevronRight, Swords, Crown } from 'lucide-react';
+import { Trophy, Settings, BarChart3, User, ChevronRight, Swords, Crown, Pencil } from 'lucide-react';
 
 interface MenuProps {
   onSelectMode: (mode: GameMode) => void;
@@ -44,6 +44,14 @@ export function Menu({ onSelectMode, playerName, playerElo, playerAvatar }: Menu
       icon: <Crown className="w-7 h-7" />,
       gradient: 'from-purple-500 to-pink-500',
       glow: 'shadow-purple-500/30',
+    },
+    {
+      mode: 'custom-championship' as GameMode,
+      title: 'Torneo Personalizado',
+      description: 'Importa rivales de info64 o crea el tuyo',
+      icon: <Pencil className="w-7 h-7" />,
+      gradient: 'from-teal-500 to-emerald-500',
+      glow: 'shadow-teal-500/30',
     },
   ];
 

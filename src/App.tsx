@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 import type { GameMode, Bot } from '@/types';
-import { useBots, usePlayerStats, useProfile, useChampionshipState } from '@/hooks/useStorage';
+import { useBots, usePlayerStats, useProfile, useChampionshipState, useCustomChampionshipState } from '@/hooks/useStorage';
 import { useAchievements } from '@/hooks/useAchievements';
 import { Menu } from '@/components/Menu';
 import { BotSelector } from '@/components/BotSelector';
 import { Tournament } from '@/components/Tournament';
 import { Championship } from '@/components/Championship';
+import { CustomChampionship } from '@/components/CustomChampionship';
 import { CustomBots } from '@/components/CustomBots';
 import { Stats } from '@/components/Stats';
 import { Profile } from '@/components/Profile';
@@ -34,6 +35,7 @@ function App() {
   const { profile, isLoaded: profileLoaded, createProfile, updateProfile, resetAllData } = useProfile();
   const { achievements, processGameEnd } = useAchievements(stats);
   const { submitUserResultAndSimulateRound } = useChampionshipState();
+  const { submitUserResultAndSimulateRound: submitCustomResult } = useCustomChampionshipState();
 
   const handleSelectMode = useCallback((newMode: GameMode) => {
     setMode(newMode);
@@ -98,9 +100,16 @@ function App() {
       // Si estamos en modo campeonato, registrar resultado y simular ronda
       if (returnMode === 'championship') {
         submitUserResultAndSimulateRound(payload.result);
-        // Volver al modo campeonato después de la partida
         setTimeout(() => {
           setMode('championship');
+          setCurrentBot(null);
+        }, 2000);
+      }
+
+      if (returnMode === 'custom-championship') {
+        submitCustomResult(payload.result);
+        setTimeout(() => {
+          setMode('custom-championship');
           setCurrentBot(null);
         }, 2000);
       }
@@ -218,6 +227,27 @@ function App() {
             onResetAllData={resetAllData}
             onBack={() => handleBack('menu')}
             achievements={achievements}
+          />
+        );
+
+      case 'custom-championship':
+        if (!profile) {
+          return (
+            <div className="w-full max-w-md mx-auto px-4 py-6">
+              <div className="text-center py-12">
+                <p className="text-gray-400 mb-4">Necesitas crear un perfil primero</p>
+                <button onClick={() => handleSelectMode('profile')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg">
+                  Crear Perfil
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <CustomChampionship
+            userProfile={profile}
+            onSelectBot={(bot, color) => startGame(bot, 'custom-championship', color ?? 'w')}
+            onBack={() => handleBack('menu')}
           />
         );
 

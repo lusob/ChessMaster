@@ -3,6 +3,7 @@ import type {
   ChampionshipPairing,
   ChampionshipPlayer,
   ChampionshipState,
+  CustomChampionshipPlayer,
   PlayerProfile,
 } from '@/types';
 
@@ -159,6 +160,52 @@ export function createInitialChampionshipState(params: {
     startedAt: Date.now(),
     completed: false,
     adaptive,
+  };
+}
+
+// Crea un campeonato personalizado a partir de una lista de jugadores ya definida.
+// El jugador usuario se identifica por userId; los demás son bots/rivales.
+export function createCustomChampionshipState(params: {
+  userProfile: PlayerProfile;
+  title: string;
+  totalRounds: number;
+  opponents: CustomChampionshipPlayer[];
+}): ChampionshipState {
+  const { userProfile, totalRounds, opponents } = params;
+  const userId = userProfile.id;
+
+  const players: ChampionshipPlayer[] = [
+    {
+      id: userId,
+      name: userProfile.name,
+      emoji: '🧑‍💻',
+      elo: userProfile.elo,
+      isUser: true,
+      points: 0,
+      buchholz: 0,
+      opponents: [],
+    },
+    ...opponents.map((o) => ({
+      id: o.id,
+      name: o.name,
+      emoji: o.emoji || '🤖',
+      elo: o.elo,
+      isUser: false,
+      points: 0,
+      buchholz: 0,
+      opponents: [],
+    })),
+  ];
+
+  return {
+    seasonId: `custom-${Date.now()}`,
+    currentRound: 1,
+    totalRounds,
+    players,
+    pairings: [],
+    userId,
+    startedAt: Date.now(),
+    completed: false,
   };
 }
 

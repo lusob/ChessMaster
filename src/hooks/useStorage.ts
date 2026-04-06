@@ -5,11 +5,13 @@ import type {
   PlayerProfile,
   ChampionshipState,
   ChampionshipPlayer,
+  CustomChampionshipPlayer,
   Achievement,
 } from '@/types';
 import {
   advanceRound,
   createInitialChampionshipState,
+  createCustomChampionshipState,
   generatePairingsForCurrentRound,
   isCurrentRoundComplete,
   recalculateStandings,
@@ -23,6 +25,7 @@ const STORAGE_KEYS = {
   PROFILE: 'chess_profile',
   FIXED_BOTS_OVERRIDE: 'chess_fixed_bots_override',
   CHAMPIONSHIP: 'chess_championship_state',
+  CUSTOM_CHAMPIONSHIP: 'chess_custom_championship_state',
   ACHIEVEMENTS: 'chess_achievements',
 };
 
@@ -445,6 +448,113 @@ export function useChampionshipState() {
       if (isCurrentRoundComplete(next)) {
         next = advanceRound(next);
         // Generar pairings de la nueva ronda inmediatamente
+        if (!next.completed) {
+          next = generatePairingsForCurrentRound(next);
+        }
+      }
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
+  return {
+    championship,
+    isLoaded,
+    startNew,
+    reset,
+    ensureCurrentRoundPairings,
+    submitUserResultAndSimulateRound,
+  };
+}
+
+export function useCustomChampionshipState() {
+  const [championship, setChampionship] = useState<ChampionshipState | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHAMPIONSHIP);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as ChampionshipState;
+        const migrated: ChampionshipState = {
+          ...parsed,
+          startedAt: parsed.startedAt ?? Date.now(),
+          completed: parsed.completed ?? false,
+          players: (parsed.players ?? []).map((p: ChampionshipPlayer) => ({
+            ...p,
+            opponents: Array.isArray(p.opponents) ? p.opponents : [],
+          })),
+        };
+        setChampionship(recalculateStandings(migrated));
+      } catch {
+        setChampionship(null);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  const persist = useCallback((state: ChampionshipState | null) => {
+    if (!state) {
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_CHAMPIONSHIP);
+      return;
+    }
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_CHAMPIONSHIP, JSON.stringify(state));
+  }, []);
+
+  const startNew = useCallback((
+    userProfile: PlayerProfile,
+    title: string,
+    totalRounds: number,
+    opponents: CustomChampionshipPlayer[],
+  ) => {
+    const initial = createCustomChampionshipState({ userProfile, title, totalRounds, opponents });
+    const withPairings = generatePairingsForCurrentRound(initial);
+    persist(withPairings);
+    setChampionship(withPairings);
+    return withPairings;
+  }, [persist]);
+
+  const reset = useCallback(() => {
+    persist(null);
+    setChampionship(null);
+  }, [persist]);
+
+  const ensureCurrentRoundPairings = useCallback(() => {
+    setChampionship((prev) => {
+      if (!prev) return prev;
+      const next = generatePairingsForCurrentRound(prev);
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
+  const submitUserResultAndSimulateRound = useCallback((result: 'win' | 'loss' | 'draw') => {
+    setChampionship((prev) => {
+      let current: ChampionshipState | null = null;
+      try {
+        const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHAMPIONSHIP);
+        if (!stored) return prev;
+        const parsed = JSON.parse(stored) as ChampionshipState;
+        if (parsed.completed) return prev;
+        current = recalculateStandings({
+          ...parsed,
+          startedAt: parsed.startedAt ?? Date.now(),
+          completed: false,
+          totalRounds: parsed.totalRounds && parsed.totalRounds > 1 ? parsed.totalRounds : 7,
+          players: (parsed.players ?? []).map((p: ChampionshipPlayer) => ({
+            ...p,
+            opponents: Array.isArray(p.opponents) ? p.opponents : [],
+          })),
+        });
+      } catch {
+        return prev;
+      }
+      if (!current || current.completed) return prev;
+      let next = generatePairingsForCurrentRound(current);
+      next = setUserResultForCurrentRound(next, result);
+      next = simulateRemainingMatchesForCurrentRound(next);
+      if (isCurrentRoundComplete(next)) {
+        next = advanceRound(next);
         if (!next.completed) {
           next = generatePairingsForCurrentRound(next);
         }
