@@ -28,6 +28,7 @@ export function ChessBoard({
   const {
     fen,
     history,
+    engineError,
     isPlayerTurn,
     isCheck,
     moveCount,
@@ -259,14 +260,19 @@ export function ChessBoard({
     animationDurationInMs: 200,
   };
 
-  if (stockfishError) {
+  if (stockfishError || engineError) {
+    const isOffline = !navigator.onLine;
     return (
       <div className="w-full max-w-2xl mx-auto flex flex-col items-center justify-center py-16 px-4 text-center">
-        <div className="text-5xl mb-4">⚠️</div>
-        <h2 className="text-xl font-bold text-white mb-2">Error del motor de ajedrez</h2>
+        <div className="text-5xl mb-4">{isOffline ? '📶' : '⚠️'}</div>
+        <h2 className="text-xl font-bold text-white mb-2">
+          {isOffline ? 'Sin conexión a internet' : 'Error del motor de ajedrez'}
+        </h2>
         <p className="text-gray-400 text-sm mb-6">
-          Stockfish no ha podido inicializarse correctamente.<br />
-          Por favor, reinicia la aplicación para continuar.
+          {isOffline
+            ? <>El motor Stockfish no está disponible sin conexión en este dispositivo.<br />Conéctate a internet para cargarlo por primera vez.</>
+            : <>Stockfish no ha podido inicializarse correctamente.<br />Por favor, reinicia la aplicación para continuar.</>
+          }
         </p>
         <button
           onClick={() => window.location.reload()}

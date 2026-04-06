@@ -62,23 +62,23 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
   const historyIndexRef = useRef(-1); // ref síncrono para syncState
   const stockfishRef = useRef<ReturnType<typeof getStockfishEngine> | null>(null);
   const initTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [engineError, setEngineError] = useState(false);
 
   // Inicializar Stockfish cuando el componente se monta
   useEffect(() => {
     let mounted = true;
-    
+
     const initializeStockfish = async () => {
       try {
         stockfishRef.current = getStockfishEngine();
-        // Esperar a que Stockfish esté listo
         const isReady = await waitForStockfishReady();
-        if (mounted && isReady) {
-          console.log('Stockfish inicializado correctamente');
-        } else if (mounted) {
-          console.warn('Stockfish no se inicializó a tiempo, usando fallback');
+        if (mounted && !isReady) {
+          console.warn('Stockfish no se inicializó correctamente');
+          setEngineError(true);
         }
       } catch (error) {
         console.error('Error inicializando Stockfish:', error);
+        if (mounted) setEngineError(true);
       }
     };
 
@@ -355,6 +355,7 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
   return {
     fen,
     history,
+    engineError,
     isPlayerTurn,
     status,
     isCheck,

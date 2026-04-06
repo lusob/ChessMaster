@@ -41,15 +41,20 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache all build assets except Stockfish WASM (too large ~7MB)
+        // Precache all build assets except Stockfish WASM (too large ~7MB for precache)
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         globIgnores: ['**/stockfish*.wasm'],
         // Runtime caching strategies
         runtimeCaching: [
           {
-            // Stockfish WASM: network-first so it's not cached in SW
+            // Stockfish WASM: cache-first so it works offline after first load.
+            // ~7MB but runtime caching has no size limit (unlike precache).
             urlPattern: /stockfish.*\.wasm$/,
-            handler: 'NetworkOnly',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'stockfish-wasm',
+              expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
           },
           {
             // App shell: cache-first
@@ -61,7 +66,7 @@ export default defineConfig({
             },
           },
         ],
-        // Increase max asset size to handle stockfish JS (it's ~21KB gzipped but ~700KB raw)
+        // Increase max asset size to handle stockfish JS (~21KB gzipped but ~700KB raw)
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
         // Don't fail on missing revision for assets
         cleanupOutdatedCaches: true,
