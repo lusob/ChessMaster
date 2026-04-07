@@ -14,18 +14,20 @@ export interface StockfishResponse {
   error?: string;
 }
 
-// Mapeo de dificultad a parámetros de Stockfish
-function getStockfishParams(difficulty: number): { depth: number; movetime: number; skillLevel: number } {
-  if (difficulty <= 2) {
-    return { depth: 1, movetime: 50,   skillLevel: 0 };
-  } else if (difficulty <= 4) {
-    return { depth: 1, movetime: 100,  skillLevel: 1 };
-  } else if (difficulty <= 6) {
-    return { depth: 2, movetime: 300,  skillLevel: 5 };
-  } else if (difficulty <= 8) {
-    return { depth: 3, movetime: 800,  skillLevel: 12 };
+// Mapeo de ELO del bot a parámetros de Stockfish.
+// UCI_LimitStrength + UCI_Elo es el mecanismo oficial; Stockfish acepta 1320–3190.
+// Para ELOs menores usamos el mínimo (1320) y bajamos depth/movetime.
+function getStockfishParams(elo: number): { depth: number; movetime: number; skillLevel: number; limitElo: number | null } {
+  if (elo < 800) {
+    return { depth: 1, movetime: 50,   skillLevel: 0,  limitElo: 1320 };
+  } else if (elo < 1100) {
+    return { depth: 2, movetime: 100,  skillLevel: 3,  limitElo: 1320 };
+  } else if (elo < 1400) {
+    return { depth: 3, movetime: 300,  skillLevel: 8,  limitElo: elo  };
+  } else if (elo < 1700) {
+    return { depth: 4, movetime: 800,  skillLevel: 14, limitElo: elo  };
   } else {
-    return { depth: 5, movetime: 2000, skillLevel: 20 };
+    return { depth: 5, movetime: 2000, skillLevel: 20, limitElo: null };
   }
 }
 
@@ -392,7 +394,7 @@ export class StockfishEngine {
     });
   }
 
-  async getBestMove(difficulty: number): Promise<StockfishResponse> {
+  async getBestMove(_difficulty: number, elo = 1500): Promise<StockfishResponse> {
     if (!this.isReady || !this.stockfish) {
       throw new Error('Stockfish no está listo');
     }
@@ -416,8 +418,14 @@ export class StockfishEngine {
           }
         });
 
-        const params = getStockfishParams(difficulty);
+        const params = getStockfishParams(elo);
         this.sendCommand(`setoption name Skill Level value ${params.skillLevel}`);
+        if (params.limitElo !== null) {
+          this.sendCommand(`setoption name UCI_LimitStrength value true`);
+          this.sendCommand(`setoption name UCI_Elo value ${params.limitElo}`);
+        } else {
+          this.sendCommand(`setoption name UCI_LimitStrength value false`);
+        }
         this.sendCommand(`go depth ${params.depth} movetime ${params.movetime}`);
       });
     } catch (e) {

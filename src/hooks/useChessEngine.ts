@@ -217,29 +217,14 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
 
     if (moves.length === 0) return null;
 
-    // Para bots muy débiles, hacer movimientos aleatorios con cierta probabilidad.
-    // Esto simula los errores humanos que Stockfish no reproduce bien incluso con
-    // Skill Level 0 (sigue jugando "razonablemente" a depth 1).
-    // ELO 200  → 50% aleatorio, ELO 500 → 25%, ELO 800 → 10%, ELO ≥ 1000 → 0%
-    const randomChance = elo < 1000 ? Math.max(0, (1000 - elo) / 1600) : 0;
-    if (randomChance > 0 && Math.random() < randomChance) {
-      const randomMove = moves[Math.floor(Math.random() * moves.length)];
-      const legalMove = game.move({ from: randomMove.from, to: randomMove.to, promotion: 'q' });
-      if (legalMove) {
-        syncState();
-        return { from: randomMove.from as Square, to: randomMove.to as Square };
-      }
-    }
-
     const engine = stockfishRef.current;
     if (!engine || !engine.ready) {
       throw new Error('Stockfish no está listo');
     }
 
-    // Usar Stockfish para obtener el mejor movimiento
     const currentFen = game.fen();
     await engine.setPosition(currentFen);
-    const response = await engine.getBestMove(difficulty);
+    const response = await engine.getBestMove(difficulty, elo);
 
     if (response.type === 'bestmove' && response.from && response.to) {
       const move = {
