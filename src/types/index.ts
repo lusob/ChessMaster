@@ -108,7 +108,6 @@ export type GameMode =
   | 'game'
   | 'tournament'
   | 'championship'
-  | 'custom-championship'
   | 'custom-bots'
   | 'stats'
   | 'profile';
@@ -120,17 +119,17 @@ export interface CustomChampionshipPlayer {
   emoji: string;
   elo: number;
   club?: string;
-  photoUrl?: string;
 }
 
-// Configuración de un torneo personalizado
-export interface CustomChampionshipConfig {
-  title: string;
-  system: 'swiss'; // Extensible en el futuro
-  totalRounds: number;
-  eloMin: number;
-  eloMax: number;
-  players: CustomChampionshipPlayer[];
+// Una entrada en la lista de campeonatos del usuario
+export interface CampeonatoEntry {
+  id: string;               // Unique ID for this entry
+  name: string;             // Display name
+  type: 'siero' | 'custom'; // 'siero' = fixed 40-player Siero club, 'custom' = imported/manual
+  adaptive?: boolean;       // Only for 'siero' type
+  state: ChampionshipState | null; // null = not started yet
+  createdAt: number;
+  sourceUrl?: string;       // info64 URL if imported
 }
 
 export interface GameState {

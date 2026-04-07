@@ -27,6 +27,7 @@ const STORAGE_KEYS = {
   CHAMPIONSHIP: 'chess_championship_state',
   CUSTOM_CHAMPIONSHIP: 'chess_custom_championship_state',
   ACHIEVEMENTS: 'chess_achievements',
+  CAMPEONATOS: 'chess_campeonatos',
 };
 
 // Bots predeterminados del torneo
@@ -356,6 +357,230 @@ export function getStoredAchievements(): Achievement[] {
 export function setStoredAchievements(achievements: Achievement[]) {
   localStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(achievements));
 }
+
+// ─── Unified Campeonatos hook ──────────────────────────────────────────────
+
+export function useCampeonatos() {
+  const [entries, setEntries] = useState<import('@/types').CampeonatoEntry[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load from localStorage on mount, migrating old keys if needed
+  useEffect(() => {
+    let loaded: import('@/types').CampeonatoEntry[] = [];
+    let active: string | null = null;
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CAMPEONATOS);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { entries: import('@/types').CampeonatoEntry[]; activeId: string | null };
+        loaded = (parsed.entries ?? []).map(e => ({
+          ...e,
+          state: e.state ? migrateState(e.state) : null,
+        }));
+        active = parsed.activeId ?? null;
+      } else {
+        // Migrate old separate keys
+        const oldSiero = localStorage.getItem(STORAGE_KEYS.CHAMPIONSHIP);
+        const oldCustom = localStorage.getItem(STORAGE_KEYS.CUSTOM_CHAMPIONSHIP);
+        if (oldSiero) {
+          try {
+            const s = JSON.parse(oldSiero) as ChampionshipState;
+            const entry: import('@/types').CampeonatoEntry = {
+              id: 'siero-migrated',
+              name: 'Campeonato Club Siero',
+              type: 'siero',
+              adaptive: s.adaptive,
+              state: migrateState(s),
+              createdAt: s.startedAt ?? Date.now(),
+            };
+            loaded.push(entry);
+            active = entry.id;
+          } catch { /* ignore */ }
+        }
+        if (oldCustom) {
+          try {
+            const s = JSON.parse(oldCustom) as ChampionshipState;
+            const entry: import('@/types').CampeonatoEntry = {
+              id: `custom-migrated-${Date.now()}`,
+              name: 'Campeonato importado',
+              type: 'custom',
+              state: migrateState(s),
+              createdAt: s.startedAt ?? Date.now(),
+            };
+            loaded.push(entry);
+            if (!active) active = entry.id;
+          } catch { /* ignore */ }
+        }
+      }
+    } catch { /* ignore */ }
+
+    setEntries(loaded);
+    setActiveId(active);
+    setIsLoaded(true);
+  }, []);
+
+  const persist = useCallback((
+    newEntries: import('@/types').CampeonatoEntry[],
+    newActiveId: string | null,
+  ) => {
+    localStorage.setItem(STORAGE_KEYS.CAMPEONATOS, JSON.stringify({ entries: newEntries, activeId: newActiveId }));
+  }, []);
+
+  // Create a new "Siero" fixed championship and add to list
+  const createSiero = useCallback((userProfile: PlayerProfile, adaptive = false) => {
+    const initial = createInitialChampionshipState({ userProfile, adaptive });
+    const state = generatePairingsForCurrentRound(initial);
+    const entry: import('@/types').CampeonatoEntry = {
+      id: `siero-${Date.now()}`,
+      name: 'Campeonato Club Siero',
+      type: 'siero',
+      adaptive,
+      state,
+      createdAt: Date.now(),
+    };
+    setEntries(prev => {
+      const next = [...prev, entry];
+      persist(next, entry.id);
+      return next;
+    });
+    setActiveId(entry.id);
+    return entry;
+  }, [persist]);
+
+  // Create a custom championship from a list of opponents
+  const createCustom = useCallback((
+    userProfile: PlayerProfile,
+    name: string,
+    totalRounds: number,
+    opponents: CustomChampionshipPlayer[],
+    sourceUrl?: string,
+  ) => {
+    const initial = createCustomChampionshipState({ userProfile, title: name, totalRounds, opponents });
+    const state = generatePairingsForCurrentRound(initial);
+    const entry: import('@/types').CampeonatoEntry = {
+      id: `custom-${Date.now()}`,
+      name,
+      type: 'custom',
+      state,
+      createdAt: Date.now(),
+      sourceUrl,
+    };
+    setEntries(prev => {
+      const next = [...prev, entry];
+      persist(next, entry.id);
+      return next;
+    });
+    setActiveId(entry.id);
+    return entry;
+  }, [persist]);
+
+  const deleteEntry = useCallback((id: string) => {
+    setEntries(prev => {
+      const next = prev.filter(e => e.id !== id);
+      setActiveId(cur => {
+        const newActive = cur === id ? (next[0]?.id ?? null) : cur;
+        persist(next, newActive);
+        return newActive;
+      });
+      return next;
+    });
+  }, [persist]);
+
+  const renameEntry = useCallback((id: string, name: string) => {
+    setEntries(prev => {
+      const next = prev.map(e => e.id === id ? { ...e, name } : e);
+      setActiveId(cur => { persist(next, cur); return cur; });
+      return next;
+    });
+  }, [persist]);
+
+  const selectActive = useCallback((id: string) => {
+    setActiveId(id);
+    setEntries(prev => { persist(prev, id); return prev; });
+  }, [persist]);
+
+  const resetEntry = useCallback((id: string) => {
+    setEntries(prev => {
+      const next = prev.map(e => e.id === id ? { ...e, state: null } : e);
+      setActiveId(cur => { persist(next, cur); return cur; });
+      return next;
+    });
+  }, [persist]);
+
+  const ensurePairings = useCallback((id: string) => {
+    setEntries(prev => {
+      const entry = prev.find(e => e.id === id);
+      if (!entry?.state) return prev;
+      const next = generatePairingsForCurrentRound(entry.state);
+      const updated = prev.map(e => e.id === id ? { ...e, state: next } : e);
+      setActiveId(cur => { persist(updated, cur); return cur; });
+      return updated;
+    });
+  }, [persist]);
+
+  const submitResult = useCallback((id: string, result: 'win' | 'loss' | 'draw') => {
+    setEntries(prev => {
+      const entry = prev.find(e => e.id === id);
+      if (!entry) return prev;
+
+      // Always re-read from localStorage to avoid stale state
+      let current: ChampionshipState | null = null;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYS.CAMPEONATOS);
+        if (!raw) return prev;
+        const stored = JSON.parse(raw) as { entries: import('@/types').CampeonatoEntry[] };
+        const storedEntry = stored.entries.find(e => e.id === id);
+        if (!storedEntry?.state || storedEntry.state.completed) return prev;
+        current = migrateState(storedEntry.state);
+      } catch { return prev; }
+
+      if (!current || current.completed) return prev;
+      let next = generatePairingsForCurrentRound(current);
+      next = setUserResultForCurrentRound(next, result);
+      next = simulateRemainingMatchesForCurrentRound(next);
+      if (isCurrentRoundComplete(next)) {
+        next = advanceRound(next);
+        if (!next.completed) next = generatePairingsForCurrentRound(next);
+      }
+      const updated = prev.map(e => e.id === id ? { ...e, state: next } : e);
+      setActiveId(cur => { persist(updated, cur); return cur; });
+      return updated;
+    });
+  }, [persist]);
+
+  const activeEntry = entries.find(e => e.id === activeId) ?? null;
+
+  return {
+    entries,
+    activeId,
+    activeEntry,
+    isLoaded,
+    createSiero,
+    createCustom,
+    deleteEntry,
+    renameEntry,
+    selectActive,
+    resetEntry,
+    ensurePairings,
+    submitResult,
+  };
+}
+
+function migrateState(s: ChampionshipState): ChampionshipState {
+  return recalculateStandings({
+    ...s,
+    startedAt: s.startedAt ?? Date.now(),
+    completed: s.completed ?? false,
+    totalRounds: s.totalRounds && s.totalRounds > 1 ? s.totalRounds : 7,
+    players: (s.players ?? []).map((p: ChampionshipPlayer) => ({
+      ...p,
+      opponents: Array.isArray(p.opponents) ? p.opponents : [],
+    })),
+  });
+}
+
+// ─── Legacy hooks (kept for App.tsx transition, delegating to useCampeonatos) ─
 
 export function useChampionshipState() {
   const [championship, setChampionship] = useState<ChampionshipState | null>(null);
