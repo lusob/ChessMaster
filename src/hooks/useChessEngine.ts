@@ -217,6 +217,19 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
 
     if (moves.length === 0) return null;
 
+    // UCI_LimitStrength soporta mínimo 1320 ELO, así que para bots más débiles
+    // añadimos movimientos aleatorios ocasionales para simular errores reales.
+    // ELO 200 → ~50% aleatorio, ELO 800 → ~13%, ELO 1320+ → 0%
+    const randomChance = elo < 1320 ? (1320 - elo) / 2200 : 0;
+    if (randomChance > 0 && Math.random() < randomChance) {
+      const randomMove = moves[Math.floor(Math.random() * moves.length)];
+      const legalMove = game.move({ from: randomMove.from, to: randomMove.to, promotion: 'q' });
+      if (legalMove) {
+        syncState();
+        return { from: randomMove.from as Square, to: randomMove.to as Square };
+      }
+    }
+
     const engine = stockfishRef.current;
     if (!engine || !engine.ready) {
       throw new Error('Stockfish no está listo');
