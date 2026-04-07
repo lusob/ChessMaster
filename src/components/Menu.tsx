@@ -30,20 +30,20 @@ export function Menu({ onSelectMode, playerName, playerElo, playerAvatar }: Menu
       glow: 'shadow-blue-500/30',
     },
     {
-      mode: 'championship' as GameMode,
-      title: 'Campeonatos',
-      description: 'Siero, importar desde info64.org o crear propio',
-      icon: <Trophy className="w-7 h-7" />,
-      gradient: 'from-yellow-500 to-orange-500',
-      glow: 'shadow-yellow-500/30',
-    },
-    {
       mode: 'tournament' as GameMode,
       title: 'Torneo Rápido',
       description: '4 bots en orden de dificultad',
       icon: <Crown className="w-7 h-7" />,
       gradient: 'from-purple-500 to-pink-500',
       glow: 'shadow-purple-500/30',
+    },
+    {
+      mode: 'championship' as GameMode,
+      title: 'Campeonatos',
+      description: 'Importar desde info64.org o crear propio',
+      icon: <Trophy className="w-7 h-7" />,
+      gradient: 'from-yellow-500 to-orange-500',
+      glow: 'shadow-yellow-500/30',
     },
   ];
 
