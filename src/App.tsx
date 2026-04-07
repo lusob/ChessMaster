@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { GameMode, Bot } from '@/types';
-import { useBots, usePlayerStats, useProfile, useCampeonatos } from '@/hooks/useStorage';
+import { useBots, usePlayerStats, useProfile } from '@/hooks/useStorage';
 import { useAchievements } from '@/hooks/useAchievements';
 import { Menu } from '@/components/Menu';
 import { BotSelector } from '@/components/BotSelector';
@@ -20,6 +20,8 @@ function App() {
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
   const [returnMode, setReturnMode] = useState<GameMode>('menu');
+  // Passed to Campeonatos so it can process the result in its own hook instance
+  const [campeonatoPendingResult, setCampeonatoPendingResult] = useState<{ result: 'win' | 'loss' | 'draw'; seq: number } | null>(null);
 
   const {
     bots,
@@ -33,7 +35,6 @@ function App() {
   const { stats, isLoaded: statsLoaded, addGameResult } = usePlayerStats();
   const { profile, isLoaded: profileLoaded, createProfile, updateProfile, resetAllData } = useProfile();
   const { achievements, processGameEnd } = useAchievements(stats);
-  const { activeId: activeCampeonatoId, submitResult: submitCampeonatoResult } = useCampeonatos();
 
   const handleSelectMode = useCallback((newMode: GameMode) => {
     setMode(newMode);
@@ -95,9 +96,10 @@ function App() {
         tournamentCompleted,
       });
 
-      // Si estamos en modo campeonato, registrar resultado y simular ronda
-      if (returnMode === 'championship' && activeCampeonatoId) {
-        submitCampeonatoResult(activeCampeonatoId, payload.result);
+      // Si estamos en modo campeonato, notificar al componente Campeonatos
+      // para que procese el resultado en su propia instancia del hook
+      if (returnMode === 'championship') {
+        setCampeonatoPendingResult(prev => ({ result: payload.result, seq: (prev?.seq ?? 0) + 1 }));
         setTimeout(() => {
           setMode('championship');
           setCurrentBot(null);
@@ -115,8 +117,6 @@ function App() {
     getTournamentBots,
     processGameEnd,
     returnMode,
-    activeCampeonatoId,
-    submitCampeonatoResult,
   ]);
 
   // Pantalla de carga
@@ -124,7 +124,7 @@ function App() {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 border-4 border-blue-500 border-t-transparent 
+          <div className="w-16 h-16 mx-auto mb-4 border-4 border-blue-500 border-t-transparent
                           rounded-full animate-spin" />
           <p className="text-gray-400">Cargando...</p>
         </div>
@@ -242,6 +242,8 @@ function App() {
             userProfile={profile}
             onSelectBot={(bot, color) => startGame(bot, 'championship', color ?? 'w')}
             onBack={() => handleBack('menu')}
+            pendingResult={campeonatoPendingResult}
+            onResultProcessed={() => setCampeonatoPendingResult(null)}
           />
         );
 
@@ -260,7 +262,7 @@ function App() {
       {/* Notificación de torneo completado */}
       {tournamentProgress.length === 4 && mode === 'tournament' && (
         <div className="fixed bottom-6 left-4 right-4 max-w-md mx-auto">
-          <div className="bg-gradient-to-r from-yellow-600 to-orange-600 
+          <div className="bg-gradient-to-r from-yellow-600 to-orange-600
                           text-white p-4 rounded-xl shadow-lg text-center">
             <Trophy className="w-8 h-8 mx-auto mb-2" />
             <p className="font-bold text-lg">¡Felicitaciones!</p>
