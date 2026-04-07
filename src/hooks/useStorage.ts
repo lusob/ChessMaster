@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   Bot,
   PlayerStats,
@@ -365,6 +365,28 @@ export function useCampeonatos() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // Keep a ref always in sync so callbacks can read the latest values without
+  // depending on stale closures.
+  const entriesRef = useRef<import('@/types').CampeonatoEntry[]>([]);
+  const activeIdRef = useRef<string | null>(null);
+
+  const setEntriesAndRef = useCallback((next: import('@/types').CampeonatoEntry[]) => {
+    entriesRef.current = next;
+    setEntries(next);
+  }, []);
+
+  const setActiveIdAndRef = useCallback((next: string | null) => {
+    activeIdRef.current = next;
+    setActiveId(next);
+  }, []);
+
+  const persist = useCallback((
+    newEntries: import('@/types').CampeonatoEntry[],
+    newActiveId: string | null,
+  ) => {
+    localStorage.setItem(STORAGE_KEYS.CAMPEONATOS, JSON.stringify({ entries: newEntries, activeId: newActiveId }));
+  }, []);
+
   // Load from localStorage on mount, migrating old keys if needed
   useEffect(() => {
     let loaded: import('@/types').CampeonatoEntry[] = [];
@@ -415,19 +437,11 @@ export function useCampeonatos() {
       }
     } catch { /* ignore */ }
 
-    setEntries(loaded);
-    setActiveId(active);
+    setEntriesAndRef(loaded);
+    setActiveIdAndRef(active);
     setIsLoaded(true);
   }, []);
 
-  const persist = useCallback((
-    newEntries: import('@/types').CampeonatoEntry[],
-    newActiveId: string | null,
-  ) => {
-    localStorage.setItem(STORAGE_KEYS.CAMPEONATOS, JSON.stringify({ entries: newEntries, activeId: newActiveId }));
-  }, []);
-
-  // Create a new "Siero" fixed championship and add to list
   const createSiero = useCallback((userProfile: PlayerProfile, adaptive = false) => {
     const initial = createInitialChampionshipState({ userProfile, adaptive });
     const state = generatePairingsForCurrentRound(initial);
@@ -439,16 +453,13 @@ export function useCampeonatos() {
       state,
       createdAt: Date.now(),
     };
-    setEntries(prev => {
-      const next = [...prev, entry];
-      persist(next, entry.id);
-      return next;
-    });
-    setActiveId(entry.id);
+    const next = [...entriesRef.current, entry];
+    setEntriesAndRef(next);
+    setActiveIdAndRef(entry.id);
+    persist(next, entry.id);
     return entry;
-  }, [persist]);
+  }, [persist, setEntriesAndRef, setActiveIdAndRef]);
 
-  // Create a custom championship from a list of opponents
   const createCustom = useCallback((
     userProfile: PlayerProfile,
     name: string,
@@ -466,88 +477,77 @@ export function useCampeonatos() {
       createdAt: Date.now(),
       sourceUrl,
     };
-    setEntries(prev => {
-      const next = [...prev, entry];
-      persist(next, entry.id);
-      return next;
-    });
-    setActiveId(entry.id);
+    const next = [...entriesRef.current, entry];
+    setEntriesAndRef(next);
+    setActiveIdAndRef(entry.id);
+    persist(next, entry.id);
     return entry;
-  }, [persist]);
+  }, [persist, setEntriesAndRef, setActiveIdAndRef]);
 
   const deleteEntry = useCallback((id: string) => {
-    setEntries(prev => {
-      const next = prev.filter(e => e.id !== id);
-      setActiveId(cur => {
-        const newActive = cur === id ? (next[0]?.id ?? null) : cur;
-        persist(next, newActive);
-        return newActive;
-      });
-      return next;
-    });
-  }, [persist]);
+    const next = entriesRef.current.filter(e => e.id !== id);
+    const newActive = activeIdRef.current === id ? (next[0]?.id ?? null) : activeIdRef.current;
+    setEntriesAndRef(next);
+    setActiveIdAndRef(newActive);
+    persist(next, newActive);
+  }, [persist, setEntriesAndRef, setActiveIdAndRef]);
 
   const renameEntry = useCallback((id: string, name: string) => {
-    setEntries(prev => {
-      const next = prev.map(e => e.id === id ? { ...e, name } : e);
-      setActiveId(cur => { persist(next, cur); return cur; });
-      return next;
-    });
-  }, [persist]);
+    const next = entriesRef.current.map(e => e.id === id ? { ...e, name } : e);
+    setEntriesAndRef(next);
+    persist(next, activeIdRef.current);
+  }, [persist, setEntriesAndRef]);
 
   const selectActive = useCallback((id: string) => {
-    setActiveId(id);
-    setEntries(prev => { persist(prev, id); return prev; });
-  }, [persist]);
+    setActiveIdAndRef(id);
+    persist(entriesRef.current, id);
+  }, [persist, setActiveIdAndRef]);
 
   const resetEntry = useCallback((id: string) => {
-    setEntries(prev => {
-      const next = prev.map(e => e.id === id ? { ...e, state: null } : e);
-      setActiveId(cur => { persist(next, cur); return cur; });
-      return next;
-    });
-  }, [persist]);
+    const next = entriesRef.current.map(e => e.id === id ? { ...e, state: null } : e);
+    setEntriesAndRef(next);
+    persist(next, activeIdRef.current);
+  }, [persist, setEntriesAndRef]);
 
   const ensurePairings = useCallback((id: string) => {
-    setEntries(prev => {
-      const entry = prev.find(e => e.id === id);
-      if (!entry?.state) return prev;
-      const next = generatePairingsForCurrentRound(entry.state);
-      const updated = prev.map(e => e.id === id ? { ...e, state: next } : e);
-      setActiveId(cur => { persist(updated, cur); return cur; });
-      return updated;
-    });
-  }, [persist]);
+    const entry = entriesRef.current.find(e => e.id === id);
+    if (!entry?.state) return;
+    const newState = generatePairingsForCurrentRound(entry.state);
+    // Only update if pairings were actually added
+    if (newState === entry.state) return;
+    const next = entriesRef.current.map(e => e.id === id ? { ...e, state: newState } : e);
+    setEntriesAndRef(next);
+    persist(next, activeIdRef.current);
+  }, [persist, setEntriesAndRef]);
 
   const submitResult = useCallback((id: string, result: 'win' | 'loss' | 'draw') => {
-    setEntries(prev => {
-      const entry = prev.find(e => e.id === id);
-      if (!entry) return prev;
+    // Read directly from localStorage to always have the freshest state
+    // (avoids any stale React state issue)
+    let current: ChampionshipState | null = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.CAMPEONATOS);
+      if (!raw) return;
+      const stored = JSON.parse(raw) as { entries: import('@/types').CampeonatoEntry[]; activeId: string | null };
+      const storedEntry = stored.entries.find(e => e.id === id);
+      if (!storedEntry?.state || storedEntry.state.completed) return;
+      current = migrateState(storedEntry.state);
+    } catch { return; }
 
-      // Always re-read from localStorage to avoid stale state
-      let current: ChampionshipState | null = null;
-      try {
-        const raw = localStorage.getItem(STORAGE_KEYS.CAMPEONATOS);
-        if (!raw) return prev;
-        const stored = JSON.parse(raw) as { entries: import('@/types').CampeonatoEntry[] };
-        const storedEntry = stored.entries.find(e => e.id === id);
-        if (!storedEntry?.state || storedEntry.state.completed) return prev;
-        current = migrateState(storedEntry.state);
-      } catch { return prev; }
+    if (!current || current.completed) return;
 
-      if (!current || current.completed) return prev;
-      let next = generatePairingsForCurrentRound(current);
-      next = setUserResultForCurrentRound(next, result);
-      next = simulateRemainingMatchesForCurrentRound(next);
-      if (isCurrentRoundComplete(next)) {
-        next = advanceRound(next);
-        if (!next.completed) next = generatePairingsForCurrentRound(next);
-      }
-      const updated = prev.map(e => e.id === id ? { ...e, state: next } : e);
-      setActiveId(cur => { persist(updated, cur); return cur; });
-      return updated;
-    });
-  }, [persist]);
+    let next = generatePairingsForCurrentRound(current);
+    next = setUserResultForCurrentRound(next, result);
+    next = simulateRemainingMatchesForCurrentRound(next);
+    if (isCurrentRoundComplete(next)) {
+      next = advanceRound(next);
+      if (!next.completed) next = generatePairingsForCurrentRound(next);
+    }
+
+    // Update React state and localStorage consistently
+    const updatedEntries = entriesRef.current.map(e => e.id === id ? { ...e, state: next } : e);
+    setEntriesAndRef(updatedEntries);
+    persist(updatedEntries, activeIdRef.current);
+  }, [persist, setEntriesAndRef]);
 
   const activeEntry = entries.find(e => e.id === activeId) ?? null;
 
