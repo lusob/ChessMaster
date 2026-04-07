@@ -358,6 +358,33 @@ export function setStoredAchievements(achievements: Achievement[]) {
   localStorage.setItem(STORAGE_KEYS.ACHIEVEMENTS, JSON.stringify(achievements));
 }
 
+// ─── Pure localStorage helper — called from App outside any React hook ────
+// Reads the active campeonato from localStorage, processes the game result,
+// and writes the updated state back. No React state involved.
+export function applyChampionatoResult(result: 'win' | 'loss' | 'draw'): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CAMPEONATOS);
+    if (!raw) return;
+    const stored = JSON.parse(raw) as { entries: import('@/types').CampeonatoEntry[]; activeId: string | null };
+    const { entries, activeId } = stored;
+    if (!activeId) return;
+    const entry = entries.find(e => e.id === activeId);
+    if (!entry?.state || entry.state.completed) return;
+
+    let current = migrateState(entry.state);
+    let next = generatePairingsForCurrentRound(current);
+    next = setUserResultForCurrentRound(next, result);
+    next = simulateRemainingMatchesForCurrentRound(next);
+    if (isCurrentRoundComplete(next)) {
+      next = advanceRound(next);
+      if (!next.completed) next = generatePairingsForCurrentRound(next);
+    }
+
+    const updatedEntries = entries.map(e => e.id === activeId ? { ...e, state: next } : e);
+    localStorage.setItem(STORAGE_KEYS.CAMPEONATOS, JSON.stringify({ entries: updatedEntries, activeId }));
+  } catch { /* ignore */ }
+}
+
 // ─── Unified Campeonatos hook ──────────────────────────────────────────────
 
 export function useCampeonatos() {

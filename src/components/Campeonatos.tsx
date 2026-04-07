@@ -15,9 +15,6 @@ interface CampeonatosProps {
   userProfile: PlayerProfile;
   onSelectBot: (bot: Bot, playerColor?: 'w' | 'b') => void;
   onBack: () => void;
-  /** Incremented by App each time a championship game ends; carries the result */
-  pendingResult?: { result: 'win' | 'loss' | 'draw'; seq: number } | null;
-  onResultProcessed?: () => void;
 }
 
 type ActiveTab = 'partida' | 'clasificacion' | 'historial';
@@ -229,10 +226,10 @@ function PodiumAnimation({ players, userId }: { players: { id: string; name: str
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export function Campeonatos({ userProfile, onSelectBot, onBack, pendingResult, onResultProcessed }: CampeonatosProps) {
+export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosProps) {
   const {
     entries, activeId, activeEntry, isLoaded,
-    createSiero, createCustom, deleteEntry, renameEntry, selectActive, resetEntry, ensurePairings, submitResult,
+    createSiero, createCustom, deleteEntry, renameEntry, selectActive, resetEntry, ensurePairings,
   } = useCampeonatos();
 
   const [view, setView] = useState<View>('list');
@@ -269,13 +266,6 @@ export function Campeonatos({ userProfile, onSelectBot, onBack, pendingResult, o
     }
   }, [isLoaded]);
 
-  // Process game result sent from App after a championship game ends
-  useEffect(() => {
-    if (!pendingResult || !activeId) return;
-    submitResult(activeId, pendingResult.result);
-    setView('active');
-    onResultProcessed?.();
-  }, [pendingResult?.seq]);
 
   // ── Fetch tournament ───────────────────────────────────────────────────
 

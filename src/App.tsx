@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { GameMode, Bot } from '@/types';
-import { useBots, usePlayerStats, useProfile } from '@/hooks/useStorage';
+import { useBots, usePlayerStats, useProfile, applyChampionatoResult } from '@/hooks/useStorage';
 import { useAchievements } from '@/hooks/useAchievements';
 import { Menu } from '@/components/Menu';
 import { BotSelector } from '@/components/BotSelector';
@@ -20,8 +20,7 @@ function App() {
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
   const [returnMode, setReturnMode] = useState<GameMode>('menu');
-  // Passed to Campeonatos so it can process the result in its own hook instance
-  const [campeonatoPendingResult, setCampeonatoPendingResult] = useState<{ result: 'win' | 'loss' | 'draw'; seq: number } | null>(null);
+  const [campeonatosKey, setCampeonatosKey] = useState(0); // incremented to force Campeonatos remount after a game
 
   const {
     bots,
@@ -96,11 +95,12 @@ function App() {
         tournamentCompleted,
       });
 
-      // Si estamos en modo campeonato, notificar al componente Campeonatos
-      // para que procese el resultado en su propia instancia del hook
+      // Si estamos en modo campeonato, procesar resultado directo en localStorage
+      // y forzar remount de Campeonatos para que cargue el estado fresco
       if (returnMode === 'championship') {
-        setCampeonatoPendingResult(prev => ({ result: payload.result, seq: (prev?.seq ?? 0) + 1 }));
+        applyChampionatoResult(payload.result);
         setTimeout(() => {
+          setCampeonatosKey(k => k + 1);
           setMode('championship');
           setCurrentBot(null);
         }, 2000);
@@ -239,11 +239,10 @@ function App() {
         }
         return (
           <Campeonatos
+            key={campeonatosKey}
             userProfile={profile}
             onSelectBot={(bot, color) => startGame(bot, 'championship', color ?? 'w')}
             onBack={() => handleBack('menu')}
-            pendingResult={campeonatoPendingResult}
-            onResultProcessed={() => setCampeonatoPendingResult(null)}
           />
         );
 
