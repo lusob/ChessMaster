@@ -64,7 +64,7 @@ export function ChessBoard({
       botFirstMoveFired.current = true;
       scheduleBotMove(async () => {
         try {
-          await makeBotMove(bot.difficulty);
+          await makeBotMove(bot.difficulty, bot.elo);
           if (isGameOver()) {
             const { result, reason } = getGameResult();
             if (result) {
@@ -149,7 +149,7 @@ export function ChessBoard({
 
       scheduleBotMove(async () => {
         try {
-          await makeBotMove(bot.difficulty);
+          await makeBotMove(bot.difficulty, bot.elo);
           if (isGameOver()) {
             const { result, reason } = getGameResult();
             if (result) {
@@ -202,7 +202,7 @@ export function ChessBoard({
 
       scheduleBotMove(async () => {
         try {
-          await makeBotMove(bot.difficulty);
+          await makeBotMove(bot.difficulty, bot.elo);
           if (isGameOver()) {
             const { result, reason } = getGameResult();
             if (result) {
