@@ -218,15 +218,34 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
     if (moves.length === 0) return null;
 
     // UCI_LimitStrength soporta mínimo 1320 ELO, así que para bots más débiles
-    // añadimos movimientos aleatorios ocasionales para simular errores reales.
-    // ELO 200 → ~50% aleatorio, ELO 800 → ~13%, ELO 1320+ → 0%
+    // añadimos movimientos subóptimos ocasionales para simular errores reales.
+    // ELO 200 → ~50% subóptimo, ELO 800 → ~23%, ELO 1320+ → 0%
     const randomChance = elo < 1320 ? (1320 - elo) / 2200 : 0;
     if (randomChance > 0 && Math.random() < randomChance) {
-      const randomMove = moves[Math.floor(Math.random() * moves.length)];
-      const legalMove = game.move({ from: randomMove.from, to: randomMove.to, promotion: 'q' });
+      // Filtrar movimientos "no suicidas": excluir los que dejan una pieza
+      // capturándose sin defensa en la siguiente jugada (SEE simplificado).
+      const pieceValue: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+      const safeMoves = moves.filter(m => {
+        const testGame = new Chess(game.fen());
+        testGame.move({ from: m.from, to: m.to, promotion: 'q' });
+        const responses = testGame.moves({ verbose: true }) as import('chess.js').Move[];
+        // Si alguna respuesta del rival captura una pieza nuestra sin compensación, es "suicida"
+        const movedPieceValue = pieceValue[m.piece] ?? 0;
+        const capturedValue = m.captured ? (pieceValue[m.captured] ?? 0) : 0;
+        const opponentCanWin = responses.some(r => {
+          if (!r.captured) return false;
+          const gainForOpponent = (pieceValue[r.captured] ?? 0) - capturedValue;
+          return gainForOpponent > movedPieceValue;
+        });
+        return !opponentCanWin;
+      });
+
+      const pool = safeMoves.length > 0 ? safeMoves : moves;
+      const chosen = pool[Math.floor(Math.random() * pool.length)];
+      const legalMove = game.move({ from: chosen.from, to: chosen.to, promotion: 'q' });
       if (legalMove) {
         syncState();
-        return { from: randomMove.from as Square, to: randomMove.to as Square };
+        return { from: chosen.from as Square, to: chosen.to as Square };
       }
     }
 
