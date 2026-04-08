@@ -127,9 +127,12 @@ export interface CampeonatoEntry {
   name: string;             // Display name
   type: 'siero' | 'custom'; // 'siero' = fixed 40-player Siero club, 'custom' = imported/manual
   adaptive?: boolean;       // Only for 'siero' type
-  state: ChampionshipState | null; // null = not started yet
+  state: ChampionshipState | null; // null = not started yet / reset
   createdAt: number;
   sourceUrl?: string;       // info64 URL if imported
+  // Stored so the championship can be restarted without re-importing
+  initialOpponents?: CustomChampionshipPlayer[];
+  initialTotalRounds?: number;
 }
 
 export interface GameState {

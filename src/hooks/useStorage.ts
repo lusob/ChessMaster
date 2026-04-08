@@ -503,6 +503,8 @@ export function useCampeonatos() {
       state,
       createdAt: Date.now(),
       sourceUrl,
+      initialOpponents: opponents,
+      initialTotalRounds: totalRounds,
     };
     const next = [...entriesRef.current, entry];
     setEntriesAndRef(next);
@@ -530,8 +532,25 @@ export function useCampeonatos() {
     persist(entriesRef.current, id);
   }, [persist, setActiveIdAndRef]);
 
-  const resetEntry = useCallback((id: string) => {
-    const next = entriesRef.current.map(e => e.id === id ? { ...e, state: null } : e);
+  const resetEntry = useCallback((id: string, userProfile: PlayerProfile) => {
+    const entry = entriesRef.current.find(e => e.id === id);
+    if (!entry) return;
+
+    let newState: ChampionshipState | null = null;
+    if (entry.type === 'siero') {
+      const initial = createInitialChampionshipState({ userProfile, adaptive: entry.adaptive ?? false });
+      newState = generatePairingsForCurrentRound(initial);
+    } else if (entry.initialOpponents && entry.initialTotalRounds) {
+      const initial = createCustomChampionshipState({
+        userProfile,
+        title: entry.name,
+        totalRounds: entry.initialTotalRounds,
+        opponents: entry.initialOpponents,
+      });
+      newState = generatePairingsForCurrentRound(initial);
+    }
+
+    const next = entriesRef.current.map(e => e.id === id ? { ...e, state: newState } : e);
     setEntriesAndRef(next);
     persist(next, activeIdRef.current);
   }, [persist, setEntriesAndRef]);

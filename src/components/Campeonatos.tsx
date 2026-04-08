@@ -467,7 +467,7 @@ export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosPro
                     <Edit3 className="w-3.5 h-3.5 text-gray-400" />
                   </button>
                   {entry.state && (
-                    <button onClick={() => { if (confirm('¿Reiniciar este campeonato? Se perderá todo el progreso.')) resetEntry(entry.id); }} className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors shrink-0">
+                    <button onClick={() => { if (confirm('¿Reiniciar este campeonato? Se perderá todo el progreso.')) { resetEntry(entry.id, userProfile); selectActive(entry.id); setView('active'); } }} className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors shrink-0">
                       <RefreshCw className="w-3.5 h-3.5 text-yellow-500" />
                     </button>
                   )}
@@ -731,8 +731,8 @@ export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosPro
           </div>
         </div>
 
-        <button onClick={() => { resetEntry(activeEntry.id); setView('list'); }} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors">
-          Volver a campeonatos
+        <button onClick={() => { resetEntry(activeEntry.id, userProfile); setView('active'); }} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors">
+          Jugar de nuevo
         </button>
       </div>
     );
@@ -928,7 +928,7 @@ export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosPro
       )}
 
       <button
-        onClick={() => { if (confirm('¿Reiniciar este campeonato? Se perderá todo el progreso.')) { resetEntry(activeEntry.id); setView('list'); } }}
+        onClick={() => { if (confirm('¿Reiniciar este campeonato? Se perderá todo el progreso.')) { resetEntry(activeEntry.id, userProfile); setView('list'); } }}
         className="w-full mt-6 py-2 bg-gray-800 hover:bg-gray-700 text-gray-500 text-xs rounded-lg transition-colors"
       >
         Reiniciar Campeonato

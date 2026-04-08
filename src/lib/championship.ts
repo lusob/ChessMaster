@@ -212,15 +212,20 @@ export function createCustomChampionshipState(params: {
 export function recalculateStandings(state: ChampionshipState): ChampionshipState {
   const playersById = new Map<string, ChampionshipPlayer>();
   for (const p of state.players) {
-    playersById.set(p.id, { ...p, points: 0, buchholz: 0 });
+    // Reset points, buchholz and opponents — all will be rebuilt from pairings
+    playersById.set(p.id, { ...p, points: 0, buchholz: 0, opponents: [] });
   }
 
   for (const pairing of state.pairings) {
-    if (!pairing.result) continue;
     const white = playersById.get(pairing.whiteId);
     const black = playersById.get(pairing.blackId);
     if (!white || !black) continue;
 
+    // Rebuild opponents from every pairing (regardless of result)
+    if (!white.opponents.includes(black.id)) white.opponents.push(black.id);
+    if (!black.opponents.includes(white.id)) black.opponents.push(white.id);
+
+    if (!pairing.result) continue;
     if (pairing.result === '1-0') {
       white.points += 1;
     } else if (pairing.result === '0-1') {
