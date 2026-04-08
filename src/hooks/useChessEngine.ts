@@ -219,8 +219,8 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
 
     // UCI_LimitStrength soporta mínimo 1320 ELO, así que para bots más débiles
     // añadimos movimientos subóptimos ocasionales para simular errores reales.
-    // ELO 200 → ~50% subóptimo, ELO 800 → ~23%, ELO 1320+ → 0%
-    const randomChance = elo < 1320 ? (1320 - elo) / 2200 : 0;
+    // ELO 200 → ~28% subóptimo, ELO 800 → ~13%, ELO 1100 → ~5%, ELO 1320+ → 0%
+    const randomChance = elo < 1320 ? (1320 - elo) / 4000 : 0;
     if (randomChance > 0 && Math.random() < randomChance) {
       // Filtrar movimientos "no suicidas": excluir los que dejan una pieza
       // capturándose sin defensa en la siguiente jugada (SEE simplificado).
