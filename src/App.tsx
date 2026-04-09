@@ -132,6 +132,22 @@ function App() {
     );
   }
 
+  // Sin perfil → forzar creación antes de cualquier otra pantalla
+  if (!profile && mode !== 'profile') {
+    return (
+      <div className="min-h-screen bg-gray-900">
+        <Profile
+          profile={null}
+          onCreateProfile={(name) => { createProfile(name); setMode('menu'); }}
+          onUpdateProfile={() => {}}
+          onResetAllData={() => {}}
+          onBack={() => {}}
+          achievements={[]}
+        />
+      </div>
+    );
+  }
+
   // Renderizar según el modo
   const renderContent = () => {
     switch (mode) {
