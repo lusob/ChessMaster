@@ -1,175 +1,117 @@
-# ChessBot Arena - Aplicación Web de Ajedrez
+# ChessBot Arena
 
-Aplicación web moderna de ajedrez desarrollada con React, TypeScript y Vite. Incluye un motor de ajedrez potente basado en Stockfish que funciona completamente offline.
+Aplicación web PWA de ajedrez desarrollada con React, TypeScript y Vite. Incluye el motor Stockfish (WebAssembly) y funciona completamente offline tras la primera carga.
+
+🌐 **Demo**: https://lusob.github.io/ChessMaster/
 
 ## Características
 
-- **Motor Stockfish**: Motor de ajedrez de nivel mundial usando Stockfish.js (WebAssembly)
-- **Modo Torneo**: Desafía a 4 bots con dificultades progresivas
-- **Bots Personalizados**: Crea tus propios bots con nombre, foto y dificultad personalizada
-- **Sistema de ELO**: Rastrea tu progreso con un sistema de puntuación ELO
-- **Estadísticas**: Gráficos visuales de tu evolución y rendimiento
-- **100% Offline**: Funciona completamente sin conexión después de la primera carga
-- **Estático**: Puede desplegarse en cualquier servidor de archivos estáticos
+- **Motor Stockfish 18**: Motor de nivel mundial via WebAssembly, calibrado por ELO del rival
+- **Partida Rápida**: Elige cualquier bot y juega directamente
+- **Torneo Rápido**: Desafía 4 bots en orden de dificultad creciente
+- **Campeonatos**: Sistema suizo FIDE (Dutch Swiss) con múltiples torneos simultáneos:
+  - Campeonato Club Siero: 40 jugadores, 7 rondas, modo adaptativo opcional
+  - Importar desde info64.org: pega la URL y empieza a jugar
+  - Clasificación en tiempo real, historial de rondas, podio animado al finalizar
+- **Sistema ELO**: Puntuación ELO con historial y gráfico de evolución
+- **Logros**: Sistema de logros desbloqueables
+- **Bots personalizables**: Edita nombre, emoji y ELO de los bots fijos; crea bots propios
+- **100% Offline**: PWA con Service Worker — funciona sin conexión tras la primera carga
+- **Persistencia local**: Todo se guarda en localStorage, sin backend ni cuenta
 
 ## Tecnologías
 
 - **React 19** + **TypeScript**
-- **Vite** - Build tool y dev server
-- **chess.js** - Lógica del juego de ajedrez
-- **react-chessboard** - Componente de tablero interactivo
-- **stockfish.js** - Motor de ajedrez Stockfish compilado para navegador
-- **Tailwind CSS** - Estilos modernos
-- **Radix UI** - Componentes accesibles
+- **Vite** + **vite-plugin-pwa** — build y Service Worker
+- **chess.js** — lógica del juego
+- **react-chessboard** — tablero interactivo
+- **Stockfish 18 lite** — motor de ajedrez compilado a WebAssembly
+- **Tailwind CSS** — estilos
+- **lucide-react** — iconos
 
-## Instalación
+## Instalación y desarrollo
 
 ```bash
-# Instalar dependencias
 npm install
-
-# Modo desarrollo
-npm run dev
-
-# Build para producción
-npm run build
-
-# Preview del build de producción
-npm run preview
+npm run dev       # servidor de desarrollo
+npm run build     # build de producción → dist/
+npm run preview   # preview del build
+npm run lint      # linting
 ```
 
-## Despliegue en Servidores Estáticos
+## Despliegue
 
-La aplicación es 100% estática y puede desplegarse en cualquier servidor de archivos estáticos.
+La aplicación genera un build estático en `dist/`. Se puede desplegar en cualquier servidor estático.
 
-### GitHub Pages
+### GitHub Pages (configuración actual)
 
-1. Construye la aplicación:
-   ```bash
-   npm run build
-   ```
+El despliegue está automatizado via GitHub Actions en `.github/workflows/`:
 
-2. Sube el contenido de la carpeta `dist/` a tu repositorio de GitHub
+```yaml
+- run: npm install
+- run: npm run build
+- uses: peaceiris/actions-gh-pages@v3
+  with:
+    publish_dir: ./app/dist
+```
 
-3. Configura GitHub Pages para servir desde la carpeta raíz o desde `dist/`
+Cada push a `main` despliega automáticamente.
 
-4. Opcional: Configura un workflow de GitHub Actions para automatizar el despliegue:
-   ```yaml
-   name: Deploy to GitHub Pages
-   on:
-     push:
-       branches: [ main ]
-   jobs:
-     build-and-deploy:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v2
-         - uses: actions/setup-node@v2
-           with:
-             node-version: '18'
-         - run: npm install
-         - run: npm run build
-         - uses: peaceiris/actions-gh-pages@v3
-           with:
-             github_token: ${{ secrets.GITHUB_TOKEN }}
-             publish_dir: ./dist
-   ```
+### Otros servicios
 
-### Amazon S3
+| Servicio | Build command | Publish dir |
+|---|---|---|
+| Netlify / Vercel | `npm run build` | `dist` |
+| Cloudflare Pages | `npm run build` | `dist` |
+| S3 | `npm run build` && `aws s3 sync dist/ s3://bucket` | — |
 
-1. Construye la aplicación:
-   ```bash
-   npm run build
-   ```
+## Motor de ajedrez
 
-2. Sube el contenido de `dist/` a un bucket de S3:
-   ```bash
-   aws s3 sync dist/ s3://tu-bucket-name --delete
-   ```
+Stockfish se controla por **ELO del bot** (no por nivel 1-10):
 
-3. Configura el bucket para hosting estático:
-   - Habilitar "Static website hosting"
-   - Establecer `index.html` como documento índice
-   - Configurar políticas de bucket apropiadas
+| ELO bot | UCI_LimitStrength | UCI_Elo | Depth | Movetime |
+|---|---|---|---|---|
+| < 800 | true | 1320 (mínimo) | 1 | 50 ms |
+| 800–1099 | true | 1320 | 2 | 100 ms |
+| 1100–1399 | true | ELO exacto | 3 | 300 ms |
+| 1400–1699 | true | ELO exacto | 4 | 800 ms |
+| ≥ 1700 | false | — | 5 | 2000 ms |
 
-### Netlify / Vercel
+Para bots con ELO < 1320 (por debajo del mínimo de `UCI_LimitStrength`), se añaden movimientos subóptimos ocasionales para simular errores de jugadores novatos, filtrando los movimientos claramente suicidas.
 
-1. Conecta tu repositorio a Netlify o Vercel
+## Sistema suizo (Campeonatos)
 
-2. Configura el build:
-   - **Build command**: `npm run build`
-   - **Publish directory**: `dist`
+Implementación del **Dutch Swiss FIDE**:
 
-3. Despliega automáticamente en cada push
+- **Ronda 1**: jugadores ordenados por ELO, mitad superior vs mitad inferior (1º vs N/2+1º, etc.)
+- **Rondas siguientes**: agrupar por puntos, dentro de cada grupo ordenar por ELO y emparejar mitad superior vs mitad inferior; los grupos impares flotan el último jugador al grupo siguiente
+- **Mesa 1** = par con mayor puntuación media (como info64.org)
+- **Desempate**: Buchholz (suma de puntos de los rivales)
+- Se evitan repeticiones de rival usando el historial de pairings
 
-### Otros Servidores Estáticos
-
-Cualquier servidor que pueda servir archivos estáticos funcionará:
-- Apache
-- Nginx
-- Surge.sh
-- Firebase Hosting
-- Cloudflare Pages
-
-Simplemente sube el contenido de `dist/` al servidor.
-
-## Funcionamiento Offline
-
-La aplicación funciona completamente offline después de la primera carga:
-
-- Todos los assets (JS, CSS, imágenes) se empaquetan en el build
-- Stockfish.js se ejecuta completamente en el navegador usando WebAssembly
-- Los datos se guardan en localStorage del navegador
-- No se requieren llamadas a APIs externas
-
-## Estructura del Proyecto
+## Estructura del proyecto
 
 ```
 app/
 ├── src/
-│   ├── components/        # Componentes React
-│   │   ├── chess/        # Componentes del tablero
-│   │   ├── Tournament.tsx # Modo torneo
-│   │   ├── BotSelector.tsx # Selector de bots
+│   ├── components/
+│   │   ├── chess/              # Tablero y lógica de partida
+│   │   ├── Campeonatos.tsx     # Gestión de campeonatos (lista, activo, podio)
+│   │   ├── Tournament.tsx      # Torneo rápido
+│   │   ├── BotSelector.tsx     # Selector de bots para partida rápida
+│   │   ├── Menu.tsx            # Menú principal
 │   │   └── ...
-│   ├── hooks/            # Custom hooks
-│   │   └── useChessEngine.ts # Hook principal del motor de ajedrez
-│   ├── workers/          # Web Workers
-│   │   └── stockfishWorkerWrapper.ts # Wrapper de Stockfish
-│   ├── types/            # Definiciones de tipos TypeScript
-│   └── ...
-├── dist/                 # Build de producción (generado)
-└── package.json
-```
-
-## Motor de Ajedrez
-
-La aplicación usa **Stockfish**, uno de los motores de ajedrez más fuertes del mundo:
-
-- **Niveles 1-2**: Profundidad 1, tiempo ~100ms (Principiante)
-- **Niveles 3-4**: Profundidad 2, tiempo ~200ms (Básico)
-- **Niveles 5-6**: Profundidad 3, tiempo ~500ms (Intermedio)
-- **Niveles 7-8**: Profundidad 4, tiempo ~1000ms (Avanzado)
-- **Niveles 9-10**: Profundidad 5, tiempo ~2000ms (Experto)
-
-El motor se ejecuta en el navegador usando WebAssembly, sin necesidad de servidor backend.
-
-## Desarrollo
-
-```bash
-# Instalar dependencias
-npm install
-
-# Iniciar servidor de desarrollo
-npm run dev
-
-# Linting
-npm run lint
-
-# Build para producción
-npm run build
+│   ├── hooks/
+│   │   ├── useChessEngine.ts   # Motor de ajedrez + lógica de movimientos
+│   │   └── useStorage.ts       # Persistencia (localStorage) y hooks de estado
+│   ├── lib/
+│   │   └── championship.ts     # Sistema suizo, emparejamientos, standings
+│   ├── workers/
+│   │   └── stockfishWorkerWrapper.ts  # Wrapper Stockfish WebAssembly
+│   └── types/index.ts          # Tipos TypeScript
+└── dist/                       # Build de producción (generado)
 ```
 
 ## Licencia
 
-Este proyecto es de código abierto y está disponible bajo la licencia MIT.
+MIT
