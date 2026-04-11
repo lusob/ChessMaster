@@ -510,7 +510,8 @@ export function championshipPlayerToBot(player: ChampionshipPlayer): Bot {
     name: player.name,
     emoji: player.emoji,
     difficulty,
-    elo: effectiveElo, // Stockfish usa este valor
+    elo: effectiveElo,         // Stockfish usa este valor
+    displayElo: player.elo,    // ELO real mostrado al usuario
     description: 'Rival del Campeonato',
     isCustom: false,
     inTournament: false,

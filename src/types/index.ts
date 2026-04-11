@@ -5,7 +5,8 @@ export interface Bot {
   name: string;
   emoji: string;
   difficulty: number; // 1-10
-  elo: number;
+  elo: number;        // ELO usado por Stockfish (botElo)
+  displayElo?: number; // ELO real mostrado al usuario (si difiere de elo)
   description: string;
   isCustom: boolean;
   photoUrl?: string;

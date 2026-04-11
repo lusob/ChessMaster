@@ -298,7 +298,7 @@ export function ChessBoard({
           <div>
             <p className="font-semibold text-white">{bot.name}</p>
             <p className="text-xs text-gray-400">
-              ELO: {bot.elo}
+              ELO: {bot.displayElo ?? bot.elo}
             </p>
           </div>
         </div>
