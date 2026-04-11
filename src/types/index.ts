@@ -62,7 +62,8 @@ export interface ChampionshipPlayer {
   id: string;
   name: string;
   emoji: string;
-  elo: number;
+  elo: number;      // ELO real (0 = sin ELO registrado)
+  botElo?: number;  // ELO interno para Stockfish (calculado, nunca mostrado)
   isUser: boolean;
   points: number;
   // Para desempates simples
@@ -117,7 +118,8 @@ export interface CustomChampionshipPlayer {
   id: string;
   name: string;
   emoji: string;
-  elo: number;
+  elo: number;      // ELO real (0 = sin ELO registrado)
+  botElo?: number;  // ELO interno para Stockfish
   club?: string;
 }
 

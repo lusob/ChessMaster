@@ -11,6 +11,20 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+// Calcula el ELO interno para Stockfish a partir del ELO real del jugador.
+// Los ELOs locales/nacionales suelen ser ~500 puntos más bajos que FIDE/Stockfish.
+// Fórmula: botElo = realElo + 500 * max(0, (1320 - realElo) / 1320)
+// - ELO 0 (NR)  → 500
+// - ELO 324     → 324 + 500*(996/1320) ≈ 702
+// - ELO 800     → 800 + 500*(520/1320) ≈ 997
+// - ELO 1320    → 1320 + 0 = 1320
+// - ELO 1500+   → sin cambio
+export function calcBotElo(realElo: number): number {
+  const base = realElo <= 0 ? 500 : realElo;
+  const bonus = 500 * Math.max(0, (1320 - base) / 1320);
+  return Math.round(base + bonus);
+}
+
 function expectedScore(eloA: number, eloB: number) {
   return 1 / (1 + Math.pow(10, (eloB - eloA) / 400));
 }
@@ -190,6 +204,7 @@ export function createCustomChampionshipState(params: {
       name: o.name,
       emoji: o.emoji || '🤖',
       elo: o.elo,
+      botElo: o.botElo ?? calcBotElo(o.elo),
       isUser: false,
       points: 0,
       buchholz: 0,
@@ -487,13 +502,15 @@ export function advanceRound(state: ChampionshipState): ChampionshipState {
 
 export function championshipPlayerToBot(player: ChampionshipPlayer): Bot {
   // ELO 100 → difficulty 1, ELO 1500 → difficulty 10, lineal
-  const difficulty = clamp(Math.round(((player.elo - 100) / 1400) * 9) + 1, 1, 10);
+  // Usar botElo para Stockfish; si no existe, calcularlo desde elo real
+  const effectiveElo = player.botElo ?? calcBotElo(player.elo);
+  const difficulty = clamp(Math.round(((effectiveElo - 100) / 1400) * 9) + 1, 1, 10);
   return {
     id: player.id,
     name: player.name,
     emoji: player.emoji,
     difficulty,
-    elo: player.elo,
+    elo: effectiveElo, // Stockfish usa este valor
     description: 'Rival del Campeonato',
     isCustom: false,
     inTournament: false,

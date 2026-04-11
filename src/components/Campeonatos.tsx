@@ -5,6 +5,7 @@ import {
   getUserPairingForRound,
   championshipPlayerToBot,
   isCurrentRoundComplete,
+  calcBotElo,
 } from '@/lib/championship';
 import {
   ChevronLeft, Trophy, Play, Award, TrendingUp, List, BarChart2, Zap,
@@ -25,6 +26,10 @@ const EMOJIS = ['🤖', '🧑', '👦', '👧', '🧒', '🧔', '👨', '👩', 
 
 function randomEmoji() {
   return EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+}
+
+function fmtElo(elo: number) {
+  return elo > 0 ? String(elo) : 'NR';
 }
 
 interface TournamentData {
@@ -74,11 +79,19 @@ function parseInfo64Html(html: string): TournamentData | null {
 
     const fideElo = parseInt(fideEl?.textContent?.trim() ?? '0', 10);
     const natElo = parseInt(natEl?.textContent?.trim() ?? '0', 10);
-    const elo = fideElo > 0 ? fideElo : natElo > 0 ? natElo : 800;
+    // Importar ELO real: FIDE si existe, nacional si no, 0 si ninguno (NR)
+    const elo = fideElo > 0 ? fideElo : natElo > 0 ? natElo : 0;
     const club = clubEl?.textContent?.trim() ?? '';
 
     if (name) {
-      players.push({ id: `info64-${players.length}`, name, emoji: randomEmoji(), elo, club: club || undefined });
+      players.push({
+        id: `info64-${players.length}`,
+        name,
+        emoji: randomEmoji(),
+        elo,
+        botElo: calcBotElo(elo),
+        club: club || undefined,
+      });
     }
   }
 
@@ -154,7 +167,7 @@ function PlayerRow({
         <p className="text-white text-sm font-medium truncate">{player.name}</p>
         {player.club && <p className="text-gray-500 text-xs truncate">{player.club}</p>}
       </div>
-      <span className="text-yellow-400 text-xs font-bold shrink-0">{player.elo}</span>
+      <span className="text-yellow-400 text-xs font-bold shrink-0">{fmtElo(player.elo)}</span>
       <button onClick={() => setEditing(true)} className="p-1 hover:bg-gray-700 rounded-lg transition-colors shrink-0">
         <Edit3 className="w-3.5 h-3.5 text-gray-400" />
       </button>
@@ -330,6 +343,13 @@ export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosPro
       ? currentPairing.blackId : currentPairing.whiteId;
     const opponent = championship.players.find(p => p.id === opponentId);
     return opponent ? championshipPlayerToBot(opponent) : null;
+  }, [championship, currentPairing]);
+
+  const opponentPlayer = useMemo(() => {
+    if (!championship || !currentPairing) return null;
+    const opponentId = currentPairing.whiteId === championship.userId
+      ? currentPairing.blackId : currentPairing.whiteId;
+    return championship.players.find(p => p.id === opponentId) ?? null;
   }, [championship, currentPairing]);
 
   const userColorThisRound = useMemo((): 'w' | 'b' => {
@@ -813,7 +833,7 @@ export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosPro
                   <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl bg-gray-700">{opponentBot.emoji}</div>
                   <div>
                     <p className="font-bold text-white text-lg">{opponentBot.name}</p>
-                    <p className="text-sm text-gray-400">ELO {opponentBot.elo}</p>
+                    <p className="text-sm text-gray-400">ELO {fmtElo(opponentPlayer?.elo ?? 0)}</p>
                     <p className="text-xs font-semibold mt-0.5">
                       <span className={userColorThisRound === 'w' ? 'text-white' : 'text-gray-500'}>
                         {userColorThisRound === 'w' ? '⬜ Juegas con blancas' : '⬛ Juegas con negras'}
@@ -871,7 +891,7 @@ export function Campeonatos({ userProfile, onSelectBot, onBack }: CampeonatosPro
                   <span className="text-base shrink-0">{player.emoji}</span>
                   <div className="flex-1 min-w-0">
                     <p className={`font-medium truncate text-xs ${isUser ? 'text-yellow-400' : 'text-white'}`}>{player.name}</p>
-                    <p className="text-xs text-gray-500">ELO {player.elo}</p>
+                    <p className="text-xs text-gray-500">ELO {fmtElo(player.elo)}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-bold text-white text-sm">{player.points} pts</p>
