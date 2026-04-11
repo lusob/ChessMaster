@@ -29,7 +29,7 @@ function randomEmoji() {
 }
 
 function fmtElo(elo: number) {
-  return elo > 0 ? String(elo) : 'NR';
+  return String(elo);
 }
 
 interface TournamentData {
