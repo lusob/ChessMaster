@@ -58,25 +58,13 @@ export function ChessBoard({
   const [gameEnded, setGameEnded] = useState(false);
   const [showMoveHistory, setShowMoveHistory] = useState(false);
   const [stockfishError, setStockfishError] = useState(false);
-  const botFirstMoveFired = useRef(false);
-  const initialMovesLoadedRef = useRef(false);
+  const firstMoveFired = useRef(false);
 
-  // Cargar movimientos iniciales (partida importada o continuación desde revisión)
+  // Carga inicial + primer movimiento del bot si le toca
   useEffect(() => {
-    if (initialMoves && initialMoves.length > 0 && !initialMovesLoadedRef.current) {
-      initialMovesLoadedRef.current = true;
-      loadMoves(initialMoves);
-      // Marcar botFirstMoveFired para que el efecto genérico no dispare el bot
-      // desde la posición inicial vacía. El efecto de isPlayerTurn se encargará.
-      botFirstMoveFired.current = true;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Si el jugador juega con negras en partida nueva, el bot (blancas) mueve primero
-  useEffect(() => {
-    if (playerColor === 'b' && !gameEnded && !botFirstMoveFired.current) {
-      botFirstMoveFired.current = true;
+    const runFirstMove = async (botTurn: boolean) => {
+      if (!botTurn || firstMoveFired.current) return;
+      firstMoveFired.current = true;
       scheduleBotMove(async () => {
         try {
           await makeBotMove(bot.difficulty, bot.elo);
@@ -85,54 +73,33 @@ export function ChessBoard({
             if (result) {
               setGameEnded(true);
               const verbose = getHistoryVerbose();
-              onGameEnd?.({
-                result,
-                moves: 1,
-                reason,
-                historySan: [],
-                lastMoveVerbose: verbose[verbose.length - 1],
-              });
+              onGameEnd?.({ result, moves: (initialMoves?.length ?? 0) + 1, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
             }
           }
         } catch {
           setStockfishError(true);
         }
       }, 600);
+    };
+
+    if (initialMoves && initialMoves.length > 0) {
+      // Partida con posición inicial cargada: calcular quién mueve desde el FEN resultante
+      loadMoves(initialMoves);
+      // Tras loadMoves, el turno en el motor es el correcto. Deducirlo desde los movimientos:
+      // número par de movimientos → turno blancas; impar → turno negras
+      const turnAfterLoad: 'w' | 'b' = initialMoves.length % 2 === 0 ? 'w' : 'b';
+      const botTurn = turnAfterLoad !== playerColor;
+      runFirstMove(botTurn);
+    } else {
+      // Partida nueva: el bot mueve primero solo si el jugador es negras
+      runFirstMove(playerColor === 'b');
     }
-  // Only run once on mount - intentional empty-ish deps (playerColor/bot won't change mid-game)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cuando se carga una posición con initialMoves y el primer turno es del bot, dispararlo
-  const initialBotMoveFired = useRef(false);
-  useEffect(() => {
-    if (!initialMoves || initialMoves.length === 0) return;
-    if (initialBotMoveFired.current) return;
-    if (gameEnded || isPlayerTurn) return;
-    // isPlayerTurn ya refleja la posición cargada (se actualiza tras loadMoves → syncState)
-    initialBotMoveFired.current = true;
-    scheduleBotMove(async () => {
-      try {
-        await makeBotMove(bot.difficulty, bot.elo);
-        if (isGameOver()) {
-          const { result, reason } = getGameResult();
-          if (result) {
-            setGameEnded(true);
-            const verbose = getHistoryVerbose();
-            onGameEnd?.({ result, moves: initialMoves.length + 1, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
-          }
-        }
-      } catch {
-        setStockfishError(true);
-      }
-    }, 600);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPlayerTurn]);
-
   // Reset game when bot changes
   const handleReset = useCallback(() => {
-    botFirstMoveFired.current = false;
-    initialMovesLoadedRef.current = false;
+    firstMoveFired.current = false;
     resetGame();
     setGameEnded(false);
     setMoveFrom(null);
