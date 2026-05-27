@@ -1,5 +1,5 @@
 import type { GameMode } from '@/types';
-import { Trophy, Settings, BarChart3, User, ChevronRight, Swords, Crown } from 'lucide-react';
+import { Trophy, Settings, BarChart3, User, ChevronRight, Swords, Crown, Upload } from 'lucide-react';
 
 interface MenuProps {
   onSelectMode: (mode: GameMode) => void;
@@ -48,9 +48,10 @@ export function Menu({ onSelectMode, playerName, playerElo, playerAvatar }: Menu
   ];
 
   const secondaryItems = [
-    { mode: 'custom-bots' as GameMode, title: 'Bots Personalizados', icon: <Settings className="w-5 h-5" />, color: 'text-purple-400' },
-    { mode: 'stats' as GameMode,       title: 'Estadísticas',         icon: <BarChart3 className="w-5 h-5" />, color: 'text-green-400' },
-    { mode: 'profile' as GameMode,     title: 'Mi Perfil',            icon: <User className="w-5 h-5" />,     color: 'text-pink-400' },
+    { mode: 'custom-bots' as GameMode,  title: 'Bots Personalizados', icon: <Settings className="w-5 h-5" />, color: 'text-purple-400' },
+    { mode: 'stats' as GameMode,        title: 'Estadísticas',         icon: <BarChart3 className="w-5 h-5" />, color: 'text-green-400' },
+    { mode: 'import-game' as GameMode,  title: 'Importar Partida',     icon: <Upload className="w-5 h-5" />,   color: 'text-blue-400' },
+    { mode: 'profile' as GameMode,      title: 'Mi Perfil',            icon: <User className="w-5 h-5" />,     color: 'text-pink-400' },
   ];
 
   return (
@@ -133,7 +134,7 @@ export function Menu({ onSelectMode, playerName, playerElo, playerAvatar }: Menu
 
       {/* Modos secundarios */}
       <div className="px-4 pt-3 pb-6">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {secondaryItems.map((item) => (
             <button
               key={item.mode}

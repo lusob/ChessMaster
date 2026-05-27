@@ -9,6 +9,7 @@ import { Campeonatos } from '@/components/Campeonatos';
 import { CustomBots } from '@/components/CustomBots';
 import { Stats } from '@/components/Stats';
 import { Profile } from '@/components/Profile';
+import { ImportGame } from '@/components/ImportGame';
 import { ChessBoard } from '@/components/chess/ChessBoard';
 import { ChevronLeft, Trophy } from 'lucide-react';
 import { fireWinConfetti } from '@/lib/confetti';
@@ -228,6 +229,15 @@ function App() {
             bots={bots}
             onBack={() => handleBack('menu')}
             onContinueFromPosition={(moves, bot, color) => startGame(bot, 'stats', color, moves)}
+          />
+        );
+
+      case 'import-game':
+        return (
+          <ImportGame
+            bots={bots}
+            onBack={() => handleBack('menu')}
+            onStartGame={(moves, bot, color) => startGame(bot, 'import-game', color, moves)}
           />
         );
 

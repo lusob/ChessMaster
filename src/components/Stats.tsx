@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Bot, GameResult, PlayerStats } from '@/types';
-import { ChevronLeft, TrendingUp, TrendingDown, Minus, ChevronDown, Eye, X, Play, Upload } from 'lucide-react';
+import { ChevronLeft, TrendingUp, TrendingDown, Minus, ChevronDown, Eye, X, Play } from 'lucide-react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import {
@@ -30,58 +30,8 @@ export function Stats({ stats, bots, onBack, onContinueFromPosition }: StatsProp
   const [filterResult, setFilterResult] = useState<'all' | 'win' | 'loss' | 'draw'>('all');
   const [selectedGame, setSelectedGame] = useState<GameResult | null>(null);
   const [replayIndex, setReplayIndex] = useState(0);
-  const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [importError, setImportError] = useState('');
   const [showContinuePicker, setShowContinuePicker] = useState(false);
   const [continueColor, setContinueColor] = useState<'w' | 'b'>('w');
-
-  const parseMoves = (text: string): string[] | null => {
-    try {
-      const chess = new Chess();
-      // Strip PGN headers (lines starting with "[") and result tokens
-      const cleaned = text
-        .replace(/\[.*?\]/g, '')
-        .replace(/\{[^}]*\}/g, '')
-        .replace(/\([^)]*\)/g, '')
-        .replace(/\$\d+/g, '')
-        .replace(/1-0|0-1|1\/2-1\/2|\*/g, '')
-        .trim();
-      // Strip move numbers like "1." "12." "1..."
-      const tokens = cleaned
-        .split(/\s+/)
-        .filter(t => t && !/^\d+\.+$/.test(t));
-      for (const san of tokens) {
-        const result = chess.move(san);
-        if (!result) return null;
-      }
-      return chess.history();
-    } catch {
-      return null;
-    }
-  };
-
-  const handleImport = () => {
-    const moves = parseMoves(importText);
-    if (!moves || moves.length === 0) {
-      setImportError('No se pudieron interpretar los movimientos. Usa notación SAN o PGN estándar.');
-      return;
-    }
-    setImportError('');
-    const importedGame: GameResult = {
-      result: 'draw',
-      eloChange: 0,
-      opponentElo: 0,
-      opponentName: 'Partida importada',
-      date: Date.now(),
-      moves: moves.length,
-      historySan: moves,
-    };
-    setSelectedGame(importedGame);
-    setReplayIndex(moves.length);
-    setShowImport(false);
-    setImportText('');
-  };
 
   const eloData = useMemo(() => {
     if (!stats?.eloHistory) return [];
@@ -149,53 +99,11 @@ export function Stats({ stats, bots, onBack, onContinueFromPosition }: StatsProp
         <button onClick={onBack} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
-        <div className="flex-1">
+        <div>
           <h2 className="text-2xl font-bold text-white">Estadísticas</h2>
           <p className="text-sm text-gray-400">Tu progreso en el tablero</p>
         </div>
-        <button
-          onClick={() => { setShowImport(v => !v); setImportError(''); }}
-          className="p-2 bg-gray-800 hover:bg-blue-600 rounded-lg transition-colors"
-          title="Importar partida"
-        >
-          <Upload className="w-5 h-5 text-white" />
-        </button>
       </div>
-
-      {/* Import panel */}
-      {showImport && (
-        <div className="bg-gray-800 rounded-xl p-4 mb-6">
-          <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
-            <Upload className="w-4 h-4 text-blue-400" />
-            Importar partida
-          </h3>
-          <p className="text-xs text-gray-400 mb-3">
-            Pega los movimientos en notación SAN (ej: e4 e5 Nf3...) o en formato PGN completo.
-          </p>
-          <textarea
-            value={importText}
-            onChange={e => { setImportText(e.target.value); setImportError(''); }}
-            placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5..."
-            className="w-full h-32 bg-gray-900 text-white text-sm rounded-lg p-3 border border-gray-700 focus:border-blue-500 focus:outline-none resize-none font-mono"
-          />
-          {importError && <p className="text-red-400 text-xs mt-1">{importError}</p>}
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleImport}
-              disabled={!importText.trim()}
-              className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
-            >
-              Cargar partida
-            </button>
-            <button
-              onClick={() => { setShowImport(false); setImportText(''); setImportError(''); }}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Resumen */}
       <div className="grid grid-cols-3 gap-3 mb-6">

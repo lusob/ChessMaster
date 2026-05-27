@@ -112,7 +112,8 @@ export type GameMode =
   | 'championship'
   | 'custom-bots'
   | 'stats'
-  | 'profile';
+  | 'profile'
+  | 'import-game';
 
 // Jugador importado/creado manualmente para torneo personalizado
 export interface CustomChampionshipPlayer {
