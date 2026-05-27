@@ -66,11 +66,14 @@ export function ChessBoard({
     if (initialMoves && initialMoves.length > 0 && !initialMovesLoadedRef.current) {
       initialMovesLoadedRef.current = true;
       loadMoves(initialMoves);
+      // Marcar botFirstMoveFired para que el efecto genérico no dispare el bot
+      // desde la posición inicial vacía. El efecto de isPlayerTurn se encargará.
+      botFirstMoveFired.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Si el jugador juega con negras, el bot (blancas) debe mover primero
+  // Si el jugador juega con negras en partida nueva, el bot (blancas) mueve primero
   useEffect(() => {
     if (playerColor === 'b' && !gameEnded && !botFirstMoveFired.current) {
       botFirstMoveFired.current = true;
@@ -99,6 +102,32 @@ export function ChessBoard({
   // Only run once on mount - intentional empty-ish deps (playerColor/bot won't change mid-game)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cuando se carga una posición con initialMoves y el primer turno es del bot, dispararlo
+  const initialBotMoveFired = useRef(false);
+  useEffect(() => {
+    if (!initialMoves || initialMoves.length === 0) return;
+    if (initialBotMoveFired.current) return;
+    if (gameEnded || isPlayerTurn) return;
+    // isPlayerTurn ya refleja la posición cargada (se actualiza tras loadMoves → syncState)
+    initialBotMoveFired.current = true;
+    scheduleBotMove(async () => {
+      try {
+        await makeBotMove(bot.difficulty, bot.elo);
+        if (isGameOver()) {
+          const { result, reason } = getGameResult();
+          if (result) {
+            setGameEnded(true);
+            const verbose = getHistoryVerbose();
+            onGameEnd?.({ result, moves: initialMoves.length + 1, reason, historySan: getHistory(), lastMoveVerbose: verbose[verbose.length - 1] });
+          }
+        }
+      } catch {
+        setStockfishError(true);
+      }
+    }, 600);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlayerTurn]);
 
   // Reset game when bot changes
   const handleReset = useCallback(() => {

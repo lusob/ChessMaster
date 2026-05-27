@@ -37,6 +37,7 @@ export function ImportGame({ bots, onBack, onStartGame }: ImportGameProps) {
   const [replayIndex, setReplayIndex] = useState(0);
   const [showContinuePicker, setShowContinuePicker] = useState(false);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
+  const [playAsBlack, setPlayAsBlack] = useState(false);
 
   const replayFen = useMemo(() => {
     if (!moves) return new Chess().fen();
@@ -65,6 +66,7 @@ export function ImportGame({ bots, onBack, onStartGame }: ImportGameProps) {
     setImportError('');
     setMoves(parsed);
     setReplayIndex(parsed.length);
+    setPlayerColor(playAsBlack ? 'b' : 'w');
     setShowContinuePicker(false);
   };
 
@@ -130,18 +132,9 @@ export function ImportGame({ bots, onBack, onStartGame }: ImportGameProps) {
 
           {showContinuePicker && !isAtEnd && (
             <div className="bg-gray-800 rounded-xl p-3 mb-3">
-              <p className="text-xs text-gray-400 mb-2">Elige tu color:</p>
-              <div className="flex gap-2 mb-3">
-                <button onClick={() => setPlayerColor('w')}
-                  className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${playerColor === 'w' ? 'bg-white text-gray-900' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
-                  ♔ Blancas
-                </button>
-                <button onClick={() => setPlayerColor('b')}
-                  className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${playerColor === 'b' ? 'bg-gray-900 text-white border border-gray-500' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>
-                  ♚ Negras
-                </button>
-              </div>
-              <p className="text-xs text-gray-400 mb-2">Elige el bot rival:</p>
+              <p className="text-xs text-gray-400 mb-2">
+                Jugarás con {playerColor === 'w' ? '♔ blancas' : '♚ negras'}. Elige el bot rival:
+              </p>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
                 {bots.map(bot => (
                   <button
@@ -213,6 +206,15 @@ export function ImportGame({ bots, onBack, onStartGame }: ImportGameProps) {
           className="w-full h-36 bg-gray-900 text-white text-sm rounded-lg p-3 border border-gray-700 focus:border-blue-500 focus:outline-none resize-none font-mono"
         />
         {importError && <p className="text-red-400 text-xs mt-1">{importError}</p>}
+        <label className="flex items-center gap-2 mt-3 cursor-pointer select-none w-fit">
+          <input
+            type="checkbox"
+            checked={playAsBlack}
+            onChange={e => setPlayAsBlack(e.target.checked)}
+            className="w-4 h-4 rounded accent-blue-500"
+          />
+          <span className="text-sm text-gray-300">Soy negras</span>
+        </label>
         <button
           onClick={handleLoad}
           disabled={!importText.trim()}
