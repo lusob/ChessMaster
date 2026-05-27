@@ -9,6 +9,7 @@ import { Loader2, List, ChevronLeft, ChevronRight, Radio } from 'lucide-react';
 interface ChessBoardProps {
   bot: Bot;
   playerColor?: 'w' | 'b';
+  initialMoves?: string[];
   onGameEnd?: (payload: {
     result: 'win' | 'loss' | 'draw';
     moves: number;
@@ -22,6 +23,7 @@ interface ChessBoardProps {
 export function ChessBoard({
   bot,
   playerColor = 'w',
+  initialMoves,
   onGameEnd,
   onMove,
 }: ChessBoardProps) {
@@ -41,6 +43,7 @@ export function ChessBoard({
     getHistory,
     getHistoryVerbose,
     resetGame,
+    loadMoves,
     goBack,
     goForward,
     goToLatest,
@@ -56,7 +59,16 @@ export function ChessBoard({
   const [showMoveHistory, setShowMoveHistory] = useState(false);
   const [stockfishError, setStockfishError] = useState(false);
   const botFirstMoveFired = useRef(false);
+  const initialMovesLoadedRef = useRef(false);
 
+  // Cargar movimientos iniciales (partida importada o continuación desde revisión)
+  useEffect(() => {
+    if (initialMoves && initialMoves.length > 0 && !initialMovesLoadedRef.current) {
+      initialMovesLoadedRef.current = true;
+      loadMoves(initialMoves);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Si el jugador juega con negras, el bot (blancas) debe mover primero
   useEffect(() => {
@@ -91,6 +103,7 @@ export function ChessBoard({
   // Reset game when bot changes
   const handleReset = useCallback(() => {
     botFirstMoveFired.current = false;
+    initialMovesLoadedRef.current = false;
     resetGame();
     setGameEnded(false);
     setMoveFrom(null);

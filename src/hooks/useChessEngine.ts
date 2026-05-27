@@ -177,6 +177,24 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
     }
   }, [syncState]);
 
+  // Cargar partida desde array de movimientos SAN
+  const loadMoves = useCallback((moves: string[]) => {
+    try {
+      const game = new Chess();
+      for (const san of moves) {
+        game.move(san);
+      }
+      gameRef.current = game;
+      setHistoryIndex(-1);
+      setLastMoveAnnotation(null);
+      setMoveAnnotations([]);
+      syncState();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [syncState, setHistoryIndex]);
+
   // Obtener movimientos legales para una pieza
   const getLegalMoves = useCallback((square: Square): Square[] => {
     const game = gameRef.current;
@@ -401,6 +419,7 @@ export function useChessEngine(playerColor: 'w' | 'b' = 'w') {
     makeBotMove,
     isGameOver,
     getGameResult,
+    loadMoves,
     getHistory: () => gameRef.current.history() as string[],
     getHistoryVerbose: () => gameRef.current.history({ verbose: true }) as any[],
     undo,

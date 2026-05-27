@@ -17,6 +17,7 @@ function App() {
   const [mode, setMode] = useState<GameMode>('menu');
   const [currentBot, setCurrentBot] = useState<Bot | null>(null);
   const [playerColor, setPlayerColor] = useState<'w' | 'b'>('w');
+  const [initialMoves, setInitialMoves] = useState<string[] | undefined>(undefined);
   const [tournamentProgress, setTournamentProgress] = useState<string[]>([]);
   const [currentTournamentIndex, setCurrentTournamentIndex] = useState(0);
   const [returnMode, setReturnMode] = useState<GameMode>('menu');
@@ -42,11 +43,13 @@ function App() {
   const handleBack = useCallback((target: GameMode = 'menu') => {
     setMode(target);
     setCurrentBot(null);
+    setInitialMoves(undefined);
   }, []);
 
-  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w') => {
+  const startGame = useCallback((bot: Bot, backTo: GameMode, color: 'w' | 'b' = 'w', moves?: string[]) => {
     setCurrentBot(bot);
     setPlayerColor(color);
+    setInitialMoves(moves);
     setReturnMode(backTo);
     setMode('game');
   }, []);
@@ -180,6 +183,7 @@ function App() {
               <ChessBoard
                 bot={currentBot}
                 playerColor={playerColor}
+                initialMoves={initialMoves}
                 onGameEnd={handleGameEnd}
               />
             </div>
@@ -221,7 +225,9 @@ function App() {
         return (
           <Stats
             stats={stats}
+            bots={bots}
             onBack={() => handleBack('menu')}
+            onContinueFromPosition={(moves, bot, color) => startGame(bot, 'stats', color, moves)}
           />
         );
 

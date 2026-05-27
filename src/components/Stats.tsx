@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { GameResult, PlayerStats } from '@/types';
-import { ChevronLeft, TrendingUp, TrendingDown, Minus, ChevronDown, Eye, X } from 'lucide-react';
+import type { Bot, GameResult, PlayerStats } from '@/types';
+import { ChevronLeft, TrendingUp, TrendingDown, Minus, ChevronDown, Eye, X, Play, Upload } from 'lucide-react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
 import {
@@ -18,16 +18,70 @@ import {
 
 interface StatsProps {
   stats: PlayerStats | null;
+  bots: Bot[];
   onBack: () => void;
+  onContinueFromPosition: (moves: string[], bot: Bot, playerColor: 'w' | 'b') => void;
 }
 
 const PAGE_SIZE = 10;
 
-export function Stats({ stats, onBack }: StatsProps) {
+export function Stats({ stats, bots, onBack, onContinueFromPosition }: StatsProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [filterResult, setFilterResult] = useState<'all' | 'win' | 'loss' | 'draw'>('all');
   const [selectedGame, setSelectedGame] = useState<GameResult | null>(null);
   const [replayIndex, setReplayIndex] = useState(0);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState('');
+  const [showContinuePicker, setShowContinuePicker] = useState(false);
+  const [continueColor, setContinueColor] = useState<'w' | 'b'>('w');
+
+  const parseMoves = (text: string): string[] | null => {
+    try {
+      const chess = new Chess();
+      // Strip PGN headers (lines starting with "[") and result tokens
+      const cleaned = text
+        .replace(/\[.*?\]/g, '')
+        .replace(/\{[^}]*\}/g, '')
+        .replace(/\([^)]*\)/g, '')
+        .replace(/\$\d+/g, '')
+        .replace(/1-0|0-1|1\/2-1\/2|\*/g, '')
+        .trim();
+      // Strip move numbers like "1." "12." "1..."
+      const tokens = cleaned
+        .split(/\s+/)
+        .filter(t => t && !/^\d+\.+$/.test(t));
+      for (const san of tokens) {
+        const result = chess.move(san);
+        if (!result) return null;
+      }
+      return chess.history();
+    } catch {
+      return null;
+    }
+  };
+
+  const handleImport = () => {
+    const moves = parseMoves(importText);
+    if (!moves || moves.length === 0) {
+      setImportError('No se pudieron interpretar los movimientos. Usa notación SAN o PGN estándar.');
+      return;
+    }
+    setImportError('');
+    const importedGame: GameResult = {
+      result: 'draw',
+      eloChange: 0,
+      opponentElo: 0,
+      opponentName: 'Partida importada',
+      date: Date.now(),
+      moves: moves.length,
+      historySan: moves,
+    };
+    setSelectedGame(importedGame);
+    setReplayIndex(moves.length);
+    setShowImport(false);
+    setImportText('');
+  };
 
   const eloData = useMemo(() => {
     if (!stats?.eloHistory) return [];
@@ -95,11 +149,53 @@ export function Stats({ stats, onBack }: StatsProps) {
         <button onClick={onBack} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-2xl font-bold text-white">Estadísticas</h2>
           <p className="text-sm text-gray-400">Tu progreso en el tablero</p>
         </div>
+        <button
+          onClick={() => { setShowImport(v => !v); setImportError(''); }}
+          className="p-2 bg-gray-800 hover:bg-blue-600 rounded-lg transition-colors"
+          title="Importar partida"
+        >
+          <Upload className="w-5 h-5 text-white" />
+        </button>
       </div>
+
+      {/* Import panel */}
+      {showImport && (
+        <div className="bg-gray-800 rounded-xl p-4 mb-6">
+          <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+            <Upload className="w-4 h-4 text-blue-400" />
+            Importar partida
+          </h3>
+          <p className="text-xs text-gray-400 mb-3">
+            Pega los movimientos en notación SAN (ej: e4 e5 Nf3...) o en formato PGN completo.
+          </p>
+          <textarea
+            value={importText}
+            onChange={e => { setImportText(e.target.value); setImportError(''); }}
+            placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5..."
+            className="w-full h-32 bg-gray-900 text-white text-sm rounded-lg p-3 border border-gray-700 focus:border-blue-500 focus:outline-none resize-none font-mono"
+          />
+          {importError && <p className="text-red-400 text-xs mt-1">{importError}</p>}
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={handleImport}
+              disabled={!importText.trim()}
+              className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Cargar partida
+            </button>
+            <button
+              onClick={() => { setShowImport(false); setImportText(''); setImportError(''); }}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Resumen */}
       <div className="grid grid-cols-3 gap-3 mb-6">
@@ -303,7 +399,7 @@ export function Stats({ stats, onBack }: StatsProps) {
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 bg-gray-800 shrink-0">
             <button
-              onClick={() => { setSelectedGame(null); setReplayIndex(0); }}
+              onClick={() => { setSelectedGame(null); setReplayIndex(0); setShowContinuePicker(false); }}
               className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-white" />
@@ -339,7 +435,7 @@ export function Stats({ stats, onBack }: StatsProps) {
           </div>
 
           {/* Controls */}
-          <div className="shrink-0 px-4 pb-4">
+          <div className="shrink-0 px-4 pb-4 overflow-y-auto max-h-64">
             <div className="flex gap-2 mb-3">
               <button
                 onClick={() => setReplayIndex(0)}
@@ -370,6 +466,57 @@ export function Stats({ stats, onBack }: StatsProps) {
                 Final &raquo;
               </button>
             </div>
+
+            {/* Continue from here */}
+            <button
+              onClick={() => setShowContinuePicker(v => !v)}
+              className="w-full mb-3 py-2 bg-green-700 hover:bg-green-600 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+            >
+              <Play className="w-4 h-4" />
+              Continuar desde aquí contra un bot
+            </button>
+
+            {showContinuePicker && (
+              <div className="bg-gray-800 rounded-xl p-3 mb-3">
+                <p className="text-xs text-gray-400 mb-2">Elige tu color:</p>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => setContinueColor('w')}
+                    className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${continueColor === 'w' ? 'bg-white text-gray-900' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                  >
+                    ♔ Blancas
+                  </button>
+                  <button
+                    onClick={() => setContinueColor('b')}
+                    className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-colors ${continueColor === 'b' ? 'bg-gray-900 text-white border border-gray-500' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                  >
+                    ♚ Negras
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-2">Elige el bot rival:</p>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {bots.map(bot => (
+                    <button
+                      key={bot.id}
+                      onClick={() => {
+                        const moves = selectedGame.historySan!.slice(0, replayIndex);
+                        onContinueFromPosition(moves, bot, continueColor);
+                        setSelectedGame(null);
+                        setShowContinuePicker(false);
+                        setReplayIndex(0);
+                      }}
+                      className="w-full flex items-center gap-3 p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-left"
+                    >
+                      <span className="text-xl">{bot.emoji}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-white font-medium truncate">{bot.name}</p>
+                        <p className="text-xs text-gray-400">ELO {bot.displayElo ?? bot.elo}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Move list */}
             <div className="bg-gray-800 rounded-xl p-3 max-h-32 overflow-y-auto">
